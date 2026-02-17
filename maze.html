@@ -131,12 +131,12 @@
     }
 
     // ============ SPRITE LOADER HELPER ============
-    function loadFrames(prefix, count) {
+    function loadFrames(prefix, count, ext = 'webp') {
       const frames = [];
       let loaded = 0;
       for (let i = 1; i <= count; i++) {
         const img = new Image();
-        img.src = `imgs/${prefix}${i}.webp`;
+        img.src = `imgs/${prefix}${i}.${ext}`;
         img.onload = () => loaded++;
         frames.push(img);
       }
@@ -145,6 +145,11 @@
 
     const thavelSprite = loadFrames('thavel', 4);
     const bloomieSprite = loadFrames('bloomie', 4);
+    const circleSprite = loadFrames('circle', 4, 'png');
+
+    // Circle's max native frame dimensions for consistent scaling
+    const CIRCLE_MAX_NAT_W = 568;
+    const CIRCLE_MAX_NAT_H = 528;
 
     const SPRITE_ANIM_FPS = 8;
     let spriteAnimTimer = 0;
@@ -168,10 +173,11 @@
     const ENEMY_VARIANTS = [
       {
         name: 'Miss Circle',
-        body: '#8b45a6', stroke: '#6b2d8b', eye: '#ff0',
-        minimap: '#8b45a6', weight: 0.20,
+        body: '#cc2222', stroke: '#991111', eye: '#ff0',
+        minimap: '#cc2222', weight: 0.20,
         speed: 16 * T, w: 9 * T, h: 10 * T,
-        sprite: null
+        drawW: 13 * T, drawH: 14 * T,
+        sprite: circleSprite
       },
       {
         name: 'Miss Bloomie',
@@ -486,7 +492,6 @@
     let thavelStunCooldown = 0;
 
     // ============ BLOOMIE ABILITY TRACKING ============
-    // States: 'ready' -> 'boosted' -> 'exhausted' -> cooldown -> 'ready'
     let bloomieState = 'ready';
     let bloomieBoostTimer = 0;
     let bloomieExhaustTimer = 0;
@@ -497,7 +502,7 @@
     const EH = enemyVariant.h;
     const BASE_ENEMY_SPEED = enemyVariant.speed;
     let currentEnemySpeed = BASE_ENEMY_SPEED;
-    const ENEMY_SPAWN_DELAY = 3;
+    const ENEMY_SPAWN_DELAY = 5;
     const enemy = { x: startTX * T, y: startTY * T, active: false, dir: 0 };
 
     let enemyWaypoints = [];
@@ -588,7 +593,6 @@
           }
         }
 
-        // Set current enemy speed based on state
         if (bloomieState === 'boosted') {
           currentEnemySpeed = BASE_ENEMY_SPEED + BLOOMIE_BOOST_AMOUNT;
         } else if (bloomieState === 'exhausted') {
@@ -766,65 +770,30 @@
     }
 
     // ============ DRAW ENEMY FUNCTIONS ============
-    function drawEnemyBox(enX, enY) {
-      const v = enemyVariant;
-      const enHW = EW / 2, enHH = EH / 2;
-      ctx.fillStyle = 'rgba(0,0,0,0.2)';
-      ctx.beginPath(); ctx.ellipse(enX + 1, enY + enHH + 3, enHW * 0.85, 5, 0, 0, Math.PI * 2); ctx.fill();
-      const ebr = 5;
-      ctx.fillStyle = v.body; ctx.beginPath();
-      ctx.moveTo(enX - enHW + ebr, enY - enHH); ctx.lineTo(enX + enHW - ebr, enY - enHH);
-      ctx.quadraticCurveTo(enX + enHW, enY - enHH, enX + enHW, enY - enHH + ebr);
-      ctx.lineTo(enX + enHW, enY + enHH - ebr); ctx.quadraticCurveTo(enX + enHW, enY + enHH, enX + enHW - ebr, enY + enHH);
-      ctx.lineTo(enX - enHW + ebr, enY + enHH); ctx.quadraticCurveTo(enX - enHW, enY + enHH, enX - enHW, enY + enHH - ebr);
-      ctx.lineTo(enX - enHW, enY - enHH + ebr); ctx.quadraticCurveTo(enX - enHW, enY - enHH, enX - enHW + ebr, enY - enHH);
-      ctx.closePath(); ctx.fill(); ctx.strokeStyle = v.stroke; ctx.lineWidth = 2; ctx.stroke();
-
-      // Bloomie boost glow
-      if (enemyVariant.name === 'Miss Bloomie' && bloomieState === 'boosted') {
-        ctx.shadowColor = '#4287f5';
-        ctx.shadowBlur = 20;
-        ctx.strokeStyle = '#80b3ff';
-        ctx.lineWidth = 3;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-      }
-
-      let eox = 0, eoy = 0;
-      if (enemy.dir === 0) eox = 3; else if (enemy.dir === 2) eox = -3;
-      if (enemy.dir === 1) eoy = 3; else if (enemy.dir === 3) eoy = -3;
-      const efaceY = enY - enHH * 0.3;
-      ctx.fillStyle = v.eye;
-      ctx.beginPath(); ctx.arc(enX - 10 + eox, efaceY + eoy, 7, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(enX + 10 + eox, efaceY + eoy, 7, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#000';
-      ctx.beginPath(); ctx.arc(enX - 9 + eox * 1.5, efaceY + eoy * 1.2, 3.5, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(enX + 11 + eox * 1.5, efaceY + eoy * 1.2, 3.5, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.moveTo(enX - 17 + eox, efaceY - 8 + eoy); ctx.lineTo(enX - 4 + eox, efaceY - 4 + eoy); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(enX + 17 + eox, efaceY - 8 + eoy); ctx.lineTo(enX + 4 + eox, efaceY - 4 + eoy); ctx.stroke();
-      ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(enX - 8 + eox * 0.5, efaceY + 18 + eoy * 0.5);
-      ctx.lineTo(enX - 3, efaceY + 14 + eoy * 0.5);
-      ctx.lineTo(enX + 3, efaceY + 18 + eoy * 0.5);
-      ctx.lineTo(enX + 8, efaceY + 14 + eoy * 0.5); ctx.stroke();
-    }
-
     function drawEnemySprite(enX, enY) {
       const sp = enemyVariant.sprite;
       const frame = sp.frames[spriteAnimFrame];
-      if (!frame || !frame.complete || frame.naturalWidth === 0) {
-        drawEnemyBox(enX, enY);
-        return;
-      }
+      if (!frame || !frame.complete || frame.naturalWidth === 0) return;
 
       const natW = frame.naturalWidth;
       const natH = frame.naturalHeight;
-      const scale = Math.min(EW / natW, EH / natH);
-      const drawW = natW * scale;
-      const drawH = natH * scale;
 
-      const flipLeft = (enemy.dir === 2);
+      let drawW, drawH;
+      if (enemyVariant.name === 'Miss Circle') {
+        // Use consistent scale based on largest frame + larger visual draw size
+        const visW = enemyVariant.drawW;
+        const visH = enemyVariant.drawH;
+        const baseScale = Math.min(visW / CIRCLE_MAX_NAT_W, visH / CIRCLE_MAX_NAT_H);
+        drawW = natW * baseScale;
+        drawH = natH * baseScale;
+      } else {
+        const scale = Math.min(EW / natW, EH / natH);
+        drawW = natW * scale;
+        drawH = natH * scale;
+      }
+
+
+      const flipLeft = (enemyVariant.name === 'Miss Circle') ? (enemy.dir === 0) : (enemy.dir === 2);
 
       ctx.save();
 
@@ -845,14 +814,14 @@
     }
 
     function drawEnemy(enX, enY) {
-      // Draw Circle's aura
+      // Draw Circle's red aura
       if (enemyVariant.name === 'Miss Circle' && enemy.active) {
         const auraPulse = Math.sin(Date.now() / 400) * 0.03 + 0.08;
-        ctx.fillStyle = `rgba(139, 69, 166, ${auraPulse})`;
+        ctx.fillStyle = `rgba(204, 34, 34, ${auraPulse})`;
         ctx.beginPath();
         ctx.arc(enX, enY, CIRCLE_AURA_RADIUS, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = `rgba(139, 69, 166, ${auraPulse + 0.1})`;
+        ctx.strokeStyle = `rgba(204, 34, 34, ${auraPulse + 0.1})`;
         ctx.lineWidth = 2;
         ctx.setLineDash([8, 6]);
         ctx.beginPath();
@@ -861,11 +830,7 @@
         ctx.setLineDash([]);
       }
 
-      if (enemyVariant.sprite) {
-        drawEnemySprite(enX, enY);
-      } else {
-        drawEnemyBox(enX, enY);
-      }
+      drawEnemySprite(enX, enY);
     }
 
     function render() {
@@ -943,7 +908,7 @@
         ctx.fillStyle = '#ffff00'; ctx.font = 'bold 14px Arial';
         ctx.fillText('⚡ STUNNED', 15, 38);
       } else if (playerSlowed) {
-        ctx.fillStyle = '#8b45a6'; ctx.font = 'bold 14px Arial';
+        ctx.fillStyle = '#cc2222'; ctx.font = 'bold 14px Arial';
         ctx.fillText('⚠ SLOWED', 15, 38);
       }
 
