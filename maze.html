@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maze Runner</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #1a1a2e;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="game"></canvas>
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    resize();
+    window.addEventListener('resize', resize);
+
+    const T = 15;
+    const MAP = 100;
+    const MAP_PX = MAP * T;
+
+    let seed;
+    function rng() {
+      seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5;
+      return (seed >>> 0) / 4294967296;
+    }
+    function rngInt(n) { return Math.floor(rng() * n); }
+    function rngShuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = rngInt(i + 1);
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    const B = 3;
+    const WALL_W = 3;
+    const CORR_W = 10;
+    const CELL = WALL_W + CORR_W;
+
+    const hLines = [];
+    const vLines = [];
+    for (let p = B; p + WALL_W <= MAP - B; p += CELL) {
+      hLines.push(p);
+      vLines.push(p);
+    }
+
+    const rows = hLines.length - 1;
+    const cols = vLines.length - 1;
+
+    const DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
+    let hSegWall, vSegWall;
+
+    function getCellOpenings(r, c) {
+      const o = [];
+      if (r > 0 && !hSegWall[r][c]) o.push({ nr: r - 1, nc: c, type: 'h', wr: r, wc: c });
+      if (r < rows - 1 && !hSegWall[r + 1][c]) o.push({ nr: r + 1, nc: c, type: 'h', wr: r + 1, wc: c });
+      if (c > 0 && !vSegWall[r][c]) o.push({ nr: r, nc: c - 1, type: 'v', wr: r, wc: c });
+      if (c < cols - 1 && !vSegWall[r][c + 1]) o.push({ nr: r, nc: c + 1, type: 'v', wr: r, wc: c + 1 });
+      return o;
+    }
+    function getClosedWalls(r, c) {
+      const w = [];
+      if (r > 0 && hSegWall[r][c]) w.push({ type: 'h', wr: r, wc: c });
+      if (r < rows - 1 && hSegWall[r + 1][c]) w.push({ type: 'h', wr: r + 1, wc: c });
+      if (c > 0 && vSegWall[r][c]) w.push({ type: 'v', wr: r, wc: c });
+      if (c < cols - 1 && vSegWall[r][c + 1]) w.push({ type: 'v', wr: r, wc: c + 1 });
+      return w;
+    }
+    function findDeadEnds() {
+      const de = [];
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++)
+        if (getCellOpenings(r, c).length === 1) de.push([r, c]);
+      return de;
+    }
+
+    const map = new Uint8Array(MAP * MAP);
+    let startTX, startTY, exitTX, exitTY;
+
+    function getCornerPos(name) {
+      const tlX = B + WALL_W + Math.floor(CORR_W / 2);
+      const tlY = B + WALL_W + Math.floor(CORR_W / 2);
+      const trX0 = vLines[cols - 1] + WALL_W;
+      const trX1 = (cols < vLines.length) ? vLines[cols] : MAP - B;
+      const trX = Math.floor((trX0 + trX1) / 2);
+      const trY = tlY;
+      const blY0 = hLines[rows - 1] + WALL_W;
+      const blY1 = (rows < hLines.length) ? hLines[rows] : MAP - B;
+      const blX = tlX;
+      const blY = Math.floor((blY0 + blY1) / 2);
+      const brX = trX;
+      const brY = blY;
+      switch (name) {
+        case 'top-left': return { x: tlX, y: tlY };
+        case 'top-right': return { x: trX, y: trY };
+        case 'bottom-left': return { x: blX, y: blY };
+        case 'bottom-right': return { x: brX, y: brY };
+      }
+    }
+
+    function chooseExitCorner(masterSeed) {
+      let s = masterSeed;
+      s ^= s << 13; s ^= s >> 17; s ^= s << 5;
+      const roll = (s >>> 0) / 4294967296;
+      if (roll < 0.50) return 'bottom-right';
+      if (roll < 0.75) return 'bottom-left';
+      return 'top-right';
+    }
+
+    // ============ SPRITE LOADER HELPER ============
+    function loadFrames(prefix, count) {
+      const frames = [];
+      let loaded = 0;
+      for (let i = 1; i <= count; i++) {
+        const img = new Image();
+        img.src = `imgs/${prefix}${i}.webp`;
+        img.onload = () => loaded++;
+        frames.push(img);
+      }
+      return { frames, isLoaded: () => loaded === count };
+    }
+
+    const thavelSprite = loadFrames('thavel', 4);
+    const bloomieSprite = loadFrames('bloomie', 4);
+
+    const SPRITE_ANIM_FPS = 8;
+    let spriteAnimTimer = 0;
+    let spriteAnimFrame = 0;
+
+    // ============ ABILITY CONSTANTS ============
+    // Circle
+    const CIRCLE_AURA_RADIUS = 20 * T;
+    const CIRCLE_SLOW_AMOUNT = 3 * T;
+    // Thavel
+    const THAVEL_STUN_RADIUS = 20 * T;
+    const THAVEL_STUN_DURATION = 0.5;
+    const THAVEL_STUN_COOLDOWN = 10;
+    // Bloomie
+    const BLOOMIE_BOOST_AMOUNT = 2 * T;
+    const BLOOMIE_BOOST_DURATION = 5;
+    const BLOOMIE_SLOW_AMOUNT = 1 * T;
+    const BLOOMIE_SLOW_DURATION = 5;
+    const BLOOMIE_COOLDOWN = 15;
+
+    const ENEMY_VARIANTS = [
+      {
+        name: 'Miss Circle',
+        body: '#8b45a6', stroke: '#6b2d8b', eye: '#ff0',
+        minimap: '#8b45a6', weight: 0.20,
+        speed: 16 * T, w: 9 * T, h: 10 * T,
+        sprite: null
+      },
+      {
+        name: 'Miss Bloomie',
+        body: '#4287f5', stroke: '#2b5fad', eye: '#fff',
+        minimap: '#4287f5', weight: 0.40,
+        speed: 18 * T, w: 6 * T, h: 6 * T,
+        sprite: bloomieSprite
+      },
+      {
+        name: 'Miss Thavel',
+        body: '#3da34d', stroke: '#2a7535', eye: '#ffd700',
+        minimap: '#3da34d', weight: 0.40,
+        speed: 16 * T, w: 8 * T, h: 7 * T,
+        sprite: thavelSprite
+      }
+    ];
+
+    function chooseEnemyVariant(masterSeed) {
+      let s = masterSeed * 2654435761 | 0;
+      s ^= s << 13; s ^= s >> 17; s ^= s << 5;
+      const roll = (s >>> 0) / 4294967296;
+      let cumulative = 0;
+      for (const v of ENEMY_VARIANTS) {
+        cumulative += v.weight;
+        if (roll < cumulative) return v;
+      }
+      return ENEMY_VARIANTS[ENEMY_VARIANTS.length - 1];
+    }
+
+    function cellCenterPx(r, c) {
+      const x0 = vLines[c] + WALL_W;
+      const x1 = (c + 1 < vLines.length) ? vLines[c + 1] : MAP - B;
+      const y0 = hLines[r] + WALL_W;
+      const y1 = (r + 1 < hLines.length) ? hLines[r + 1] : MAP - B;
+      return { x: ((x0 + x1) / 2) * T, y: ((y0 + y1) / 2) * T };
+    }
+
+    function pxToCell(px, py) {
+      let bestR = 0, bestC = 0, bestDist = Infinity;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const ctr = cellCenterPx(r, c);
+          const dx = px - ctr.x, dy = py - ctr.y;
+          const d = dx * dx + dy * dy;
+          if (d < bestDist) { bestDist = d; bestR = r; bestC = c; }
+        }
+      }
+      return { r: bestR, c: bestC };
+    }
+
+    function bfsCellPath(fromR, fromC, toR, toC) {
+      if (fromR === toR && fromC === toC) return [];
+      const total = rows * cols;
+      const vis = new Uint8Array(total);
+      const prev = new Int32Array(total).fill(-1);
+      const startId = fromR * cols + fromC;
+      const endId = toR * cols + toC;
+      vis[startId] = 1;
+      const q = [startId]; let head = 0;
+      while (head < q.length) {
+        const id = q[head++];
+        if (id === endId) {
+          const path = [];
+          let cur = endId;
+          while (cur !== -1) {
+            const pr = Math.floor(cur / cols), pc = cur % cols;
+            path.push(cellCenterPx(pr, pc));
+            cur = prev[cur];
+          }
+          path.reverse();
+          return path;
+        }
+        const cr = Math.floor(id / cols), cc = id % cols;
+        const openings = getCellOpenings(cr, cc);
+        for (const op of openings) {
+          const nid = op.nr * cols + op.nc;
+          if (!vis[nid]) {
+            vis[nid] = 1;
+            prev[nid] = id;
+            q.push(nid);
+          }
+        }
+      }
+      return [];
+    }
+
+    function generateMaze(trySeed) {
+      seed = trySeed;
+      hSegWall = Array.from({ length: hLines.length }, () => new Uint8Array(cols).fill(1));
+      vSegWall = Array.from({ length: rows }, () => new Uint8Array(vLines.length).fill(1));
+      map.fill(0);
+
+      const visited = Array.from({ length: rows }, () => new Uint8Array(cols).fill(0));
+      visited[0][0] = 1;
+      const frontier = [];
+      function addFrontier(r, c) {
+        for (const [dr, dc] of DIRS) {
+          const nr = r + dr, nc = c + dc;
+          if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+          if (!visited[nr][nc]) frontier.push({ r, c, nr, nc });
+        }
+      }
+      addFrontier(0, 0);
+      while (frontier.length > 0) {
+        const idx = rngInt(frontier.length);
+        const wall = frontier[idx];
+        frontier[idx] = frontier[frontier.length - 1];
+        frontier.pop();
+        if (visited[wall.nr][wall.nc]) continue;
+        const dr = wall.nr - wall.r, dc = wall.nc - wall.c;
+        if (dr === -1) hSegWall[wall.nr + 1][wall.nc] = 0;
+        else if (dr === 1) hSegWall[wall.nr][wall.nc] = 0;
+        else if (dc === -1) vSegWall[wall.nr][wall.nc + 1] = 0;
+        else if (dc === 1) vSegWall[wall.nr][wall.nc] = 0;
+        visited[wall.nr][wall.nc] = 1;
+        addFrontier(wall.nr, wall.nc);
+      }
+
+      for (let iter = 0; iter < 2000; iter++) {
+        const de = findDeadEnds();
+        if (de.length <= 3) break;
+        const cands = de.filter(([r, c]) => !(r === 0 && c === 0) && !(r === rows - 1 && c === cols - 1));
+        if (cands.length === 0) break;
+        const [dr, dc] = cands[rngInt(cands.length)];
+        const walls = getClosedWalls(dr, dc);
+        if (walls.length > 0) {
+          const w = walls[rngInt(walls.length)];
+          if (w.type === 'h') hSegWall[w.wr][w.wc] = 0;
+          else vSegWall[w.wr][w.wc] = 0;
+        }
+      }
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const x0 = vLines[c] + WALL_W;
+          const y0 = hLines[r] + WALL_W;
+          const x1 = (c + 1 < vLines.length) ? vLines[c + 1] : MAP - B;
+          const y1 = (r + 1 < hLines.length) ? hLines[r + 1] : MAP - B;
+          for (let y = y0; y < y1; y++)
+            for (let x = x0; x < x1; x++)
+              if (x >= 0 && x < MAP && y >= 0 && y < MAP) map[y * MAP + x] = 1;
+        }
+      }
+      for (let r = 0; r < hLines.length; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (hSegWall[r][c]) continue;
+          const y0 = hLines[r];
+          const x0 = vLines[c] + WALL_W;
+          const x1 = (c + 1 < vLines.length) ? vLines[c + 1] : MAP - B;
+          for (let dy = 0; dy < WALL_W; dy++)
+            for (let x = x0; x < x1; x++) {
+              const yy = y0 + dy;
+              if (yy >= 0 && yy < MAP && x >= 0 && x < MAP) map[yy * MAP + x] = 1;
+            }
+        }
+      }
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < vLines.length; c++) {
+          if (vSegWall[r][c]) continue;
+          const x0 = vLines[c];
+          const y0 = hLines[r] + WALL_W;
+          const y1 = (r + 1 < hLines.length) ? hLines[r + 1] : MAP - B;
+          for (let dx = 0; dx < WALL_W; dx++)
+            for (let y = y0; y < y1; y++) {
+              const xx = x0 + dx;
+              if (xx >= 0 && xx < MAP && y >= 0 && y < MAP) map[y * MAP + xx] = 1;
+            }
+        }
+      }
+      for (let r = 0; r < hLines.length; r++) {
+        for (let c = 0; c < vLines.length; c++) {
+          let hasAdjacentWall = false;
+          if (c < cols && hSegWall[r][c]) hasAdjacentWall = true;
+          if (c > 0 && hSegWall[r][c - 1]) hasAdjacentWall = true;
+          if (r < rows && vSegWall[r][c]) hasAdjacentWall = true;
+          if (r > 0 && vSegWall[r - 1][c]) hasAdjacentWall = true;
+          if (hasAdjacentWall) {
+            for (let dy = 0; dy < WALL_W; dy++) for (let dx = 0; dx < WALL_W; dx++) {
+              const yy = hLines[r] + dy, xx = vLines[c] + dx;
+              if (yy >= 0 && yy < MAP && xx >= 0 && xx < MAP) map[yy * MAP + xx] = 0;
+            }
+          }
+        }
+      }
+
+      const wallVisited = new Uint8Array(MAP * MAP);
+      for (let y = B; y < MAP - B; y++) {
+        for (let x = B; x < MAP - B; x++) {
+          if (map[y * MAP + x] !== 0 || wallVisited[y * MAP + x]) continue;
+          const comp = [];
+          let minX = x, maxX = x, minY = y, maxY = y;
+          const wq = [[x, y]]; wallVisited[y * MAP + x] = 1; let wh = 0;
+          let touchesBorder = false;
+          while (wh < wq.length) {
+            const [wx, wy] = wq[wh++];
+            comp.push([wx, wy]);
+            if (wx < minX) minX = wx; if (wx > maxX) maxX = wx;
+            if (wy < minY) minY = wy; if (wy > maxY) maxY = wy;
+            if (wx <= B || wx >= MAP - B - 1 || wy <= B || wy >= MAP - B - 1) touchesBorder = true;
+            for (const [ddx, ddy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+              const nx2 = wx + ddx, ny2 = wy + ddy;
+              if (nx2 < B || ny2 < B || nx2 >= MAP - B || ny2 >= MAP - B) continue;
+              if (map[ny2 * MAP + nx2] === 0 && !wallVisited[ny2 * MAP + nx2]) {
+                wallVisited[ny2 * MAP + nx2] = 1;
+                wq.push([nx2, ny2]);
+              }
+            }
+          }
+          if (touchesBorder) continue;
+          const spanW = maxX - minX + 1, spanH = maxY - minY + 1;
+          if (Math.max(spanW, spanH) < 16) {
+            for (const [wx, wy] of comp) map[wy * MAP + wx] = 1;
+          }
+        }
+      }
+
+      const startPos = getCornerPos('top-left');
+      startTX = startPos.x;
+      startTY = startPos.y;
+      const exitPos = getCornerPos(exitCorner);
+      exitTX = exitPos.x;
+      exitTY = exitPos.y;
+
+      function clearArea(cx, cy, rr) {
+        for (let dy = -rr; dy <= rr; dy++) for (let dx = -rr; dx <= rr; dx++) {
+          const tx = cx + dx, ty = cy + dy;
+          if (tx >= B && tx < MAP - B && ty >= B && ty < MAP - B) map[ty * MAP + tx] = 1;
+        }
+      }
+      clearArea(startTX, startTY, 2);
+      clearArea(exitTX, exitTY, 2);
+
+      if (!bfsReachable(startTX, startTY, exitTX, exitTY, -1, -1)) {
+        let cx = startTX, cy = startTY;
+        while (cx !== exitTX) {
+          for (let dy = -Math.floor(CORR_W / 2); dy < Math.ceil(CORR_W / 2); dy++) {
+            const ty = cy + dy; if (ty >= B && ty < MAP - B && cx >= B && cx < MAP - B) map[ty * MAP + cx] = 1;
+          } cx += (exitTX > cx) ? 1 : -1;
+        }
+        while (cy !== exitTY) {
+          for (let dx = -Math.floor(CORR_W / 2); dx < Math.ceil(CORR_W / 2); dx++) {
+            const tx = cx + dx; if (tx >= B && tx < MAP - B && cy >= B && cy < MAP - B) map[cy * MAP + tx] = 1;
+          } cy += (exitTY > cy) ? 1 : -1;
+        }
+      }
+    }
+
+    function bfsReachable(sx, sy, ex, ey, avoidX, avoidY) {
+      const exitAvoidR = 4;
+      const vis = new Uint8Array(MAP * MAP);
+      const q = [sx + sy * MAP]; vis[sy * MAP + sx] = 1; let head = 0;
+      while (head < q.length) {
+        const idx = q[head++]; const cx = idx % MAP, cy = (idx - cx) / MAP;
+        if (cx === ex && cy === ey) return true;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = cx + dx, ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= MAP || ny >= MAP) continue;
+          const ni = ny * MAP + nx;
+          if (vis[ni] || map[ni] !== 1) continue;
+          if (avoidX >= 0) {
+            const adx = nx - avoidX, ady = ny - avoidY;
+            if (adx * adx + ady * ady <= exitAvoidR * exitAvoidR) continue;
+          }
+          vis[ni] = 1; q.push(ni);
+        }
+      }
+      return false;
+    }
+
+    const masterSeed = Date.now();
+    const exitCorner = chooseExitCorner(masterSeed);
+    const enemyVariant = chooseEnemyVariant(masterSeed);
+
+    function getNonExitCorners() {
+      const allCorners = ['top-right', 'bottom-left', 'bottom-right'];
+      return allCorners.filter(name => name !== exitCorner);
+    }
+
+    let chosenSeed = 0;
+    for (let attempt = 0; attempt < 500; attempt++) {
+      const trySeed = (Math.random() * 2147483647) | 0;
+      generateMaze(trySeed);
+      const nonExitCorners = getNonExitCorners();
+      let allReachable = true;
+      for (const cornerName of nonExitCorners) {
+        const corner = getCornerPos(cornerName);
+        if (!bfsReachable(startTX, startTY, corner.x, corner.y, exitTX, exitTY)) {
+          allReachable = false;
+          break;
+        }
+      }
+      if (allReachable && findDeadEnds().length === 3) {
+        chosenSeed = trySeed;
+        break;
+      }
+    }
+
+    function countWalls() { let n = 0; for (let i = 0; i < MAP * MAP; i++) if (map[i] === 0) n++; return n; }
+    const wallPct = (countWalls() / (MAP * MAP) * 100).toFixed(1);
+    console.log(`Seed: ${chosenSeed}, Exit: ${exitCorner}, Enemy: ${enemyVariant.name}, Wall coverage: ${wallPct}%, Dead ends: ${findDeadEnds().length}`);
+
+    // ============ PLAYER ============
+    const PW = 3 * T, PH = 5 * T;
+    const PLAYER_SPEED = 18 * T;
+    const player = { x: startTX * T, y: startTY * T, dir: 0 };
+    const exitX = exitTX * T, exitY = exitTY * T, exitR = 3 * T;
+    let playerSlowed = false;
+    let playerStunned = false;
+    let stunTimer = 0;
+
+    // ============ THAVEL STUN TRACKING ============
+    let thavelStunCooldown = 0;
+
+    // ============ BLOOMIE ABILITY TRACKING ============
+    // States: 'ready' -> 'boosted' -> 'exhausted' -> cooldown -> 'ready'
+    let bloomieState = 'ready';
+    let bloomieBoostTimer = 0;
+    let bloomieExhaustTimer = 0;
+    let bloomieCooldown = 0;
+
+    // ============ ENEMY ============
+    const EW = enemyVariant.w;
+    const EH = enemyVariant.h;
+    const BASE_ENEMY_SPEED = enemyVariant.speed;
+    let currentEnemySpeed = BASE_ENEMY_SPEED;
+    const ENEMY_SPAWN_DELAY = 3;
+    const enemy = { x: startTX * T, y: startTY * T, active: false, dir: 0 };
+
+    let enemyWaypoints = [];
+    let enemyWpIdx = 0;
+    let lastPlayerCellR = -1, lastPlayerCellC = -1;
+    let enemyMoving = false;
+
+    function recalcEnemyPath() {
+      const eCell = pxToCell(enemy.x, enemy.y);
+      const pCell = pxToCell(player.x, player.y);
+      const path = bfsCellPath(eCell.r, eCell.c, pCell.r, pCell.c);
+      if (path.length > 0) {
+        enemyWaypoints = path;
+        enemyWpIdx = 1;
+      }
+    }
+
+    function isFloor(px, py) {
+      const tx = Math.floor(px / T), ty = Math.floor(py / T);
+      if (tx < 0 || ty < 0 || tx >= MAP || ty >= MAP) return false;
+      return map[ty * MAP + tx] === 1;
+    }
+    function canMove(px, py, hw, hh) {
+      return isFloor(px - hw, py - hh) && isFloor(px + hw, py - hh) &&
+        isFloor(px - hw, py + hh) && isFloor(px + hw, py + hh) &&
+        isFloor(px, py - hh) && isFloor(px, py + hh) &&
+        isFloor(px - hw, py) && isFloor(px + hw, py);
+    }
+
+    const keys = {};
+    document.addEventListener('keydown', e => {
+      keys[e.key] = true;
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    });
+    document.addEventListener('keyup', e => { keys[e.key] = false; });
+
+    let won = false, lost = false, startTime = Date.now(), elapsed = '0.0';
+    let lastTime = performance.now();
+
+    function update() {
+      const now = performance.now();
+      const dt = Math.min((now - lastTime) / 1000, 1 / 15);
+      lastTime = now;
+
+      if (won || lost) return;
+      const elapsedSec = (Date.now() - startTime) / 1000;
+      elapsed = elapsedSec.toFixed(1);
+
+      // ---- TICK DOWN STUN ----
+      if (stunTimer > 0) {
+        stunTimer -= dt;
+        if (stunTimer <= 0) {
+          stunTimer = 0;
+          playerStunned = false;
+        }
+      }
+
+      // ---- TICK DOWN THAVEL COOLDOWN ----
+      if (thavelStunCooldown > 0) {
+        thavelStunCooldown -= dt;
+        if (thavelStunCooldown < 0) thavelStunCooldown = 0;
+      }
+
+      // ---- BLOOMIE ABILITY STATE MACHINE ----
+      if (enemy.active && enemyVariant.name === 'Miss Bloomie') {
+        if (bloomieState === 'ready') {
+          bloomieState = 'boosted';
+          bloomieBoostTimer = BLOOMIE_BOOST_DURATION;
+        } else if (bloomieState === 'boosted') {
+          bloomieBoostTimer -= dt;
+          if (bloomieBoostTimer <= 0) {
+            bloomieBoostTimer = 0;
+            bloomieState = 'exhausted';
+            bloomieExhaustTimer = BLOOMIE_SLOW_DURATION;
+          }
+        } else if (bloomieState === 'exhausted') {
+          bloomieExhaustTimer -= dt;
+          if (bloomieExhaustTimer <= 0) {
+            bloomieExhaustTimer = 0;
+            bloomieState = 'cooldown';
+            bloomieCooldown = BLOOMIE_COOLDOWN;
+          }
+        } else if (bloomieState === 'cooldown') {
+          bloomieCooldown -= dt;
+          if (bloomieCooldown <= 0) {
+            bloomieCooldown = 0;
+            bloomieState = 'ready';
+          }
+        }
+
+        // Set current enemy speed based on state
+        if (bloomieState === 'boosted') {
+          currentEnemySpeed = BASE_ENEMY_SPEED + BLOOMIE_BOOST_AMOUNT;
+        } else if (bloomieState === 'exhausted') {
+          currentEnemySpeed = BASE_ENEMY_SPEED - BLOOMIE_SLOW_AMOUNT;
+        } else {
+          currentEnemySpeed = BASE_ENEMY_SPEED;
+        }
+      } else {
+        currentEnemySpeed = BASE_ENEMY_SPEED;
+      }
+
+      // ---- CHECK CIRCLE AURA ----
+      playerSlowed = false;
+      if (enemy.active && enemyVariant.name === 'Miss Circle') {
+        const adx = player.x - enemy.x;
+        const ady = player.y - enemy.y;
+        const auraDist = Math.sqrt(adx * adx + ady * ady);
+        if (auraDist <= CIRCLE_AURA_RADIUS) {
+          playerSlowed = true;
+        }
+      }
+
+      // ---- CHECK THAVEL STUN ----
+      if (enemy.active && enemyVariant.name === 'Miss Thavel' && thavelStunCooldown <= 0 && !playerStunned) {
+        const adx = player.x - enemy.x;
+        const ady = player.y - enemy.y;
+        const dist = Math.sqrt(adx * adx + ady * ady);
+        if (dist <= THAVEL_STUN_RADIUS) {
+          playerStunned = true;
+          stunTimer = THAVEL_STUN_DURATION;
+          thavelStunCooldown = THAVEL_STUN_COOLDOWN;
+        }
+      }
+
+      // ---- PLAYER MOVEMENT ----
+      if (!playerStunned) {
+        let currentSpeed = PLAYER_SPEED;
+        if (playerSlowed) {
+          currentSpeed = PLAYER_SPEED - CIRCLE_SLOW_AMOUNT;
+        }
+
+        let dx = 0, dy = 0;
+        if (keys['ArrowUp'] || keys['w'] || keys['W']) dy -= 1;
+        if (keys['ArrowDown'] || keys['s'] || keys['S']) dy += 1;
+        if (keys['ArrowLeft'] || keys['a'] || keys['A']) dx -= 1;
+        if (keys['ArrowRight'] || keys['d'] || keys['D']) dx += 1;
+        if (dx > 0) player.dir = 0; else if (dx < 0) player.dir = 2;
+        if (dy > 0) player.dir = 1; else if (dy < 0) player.dir = 3;
+        if (dx !== 0 && dy !== 0) { dx *= 0.7071; dy *= 0.7071; }
+        const moveX = dx * currentSpeed * dt;
+        const moveY = dy * currentSpeed * dt;
+        const hw = PW / 2 - 1, hh = PH / 2 - 1;
+        if (canMove(player.x + moveX, player.y, hw, hh)) player.x += moveX;
+        if (canMove(player.x, player.y + moveY, hw, hh)) player.y += moveY;
+      }
+
+      // ---- WIN CHECK ----
+      const wx = player.x - exitX, wy = player.y - exitY;
+      if (Math.sqrt(wx * wx + wy * wy) < exitR) won = true;
+
+      // ---- ENEMY ----
+      if (elapsedSec >= ENEMY_SPAWN_DELAY) {
+        if (!enemy.active) {
+          enemy.active = true;
+          recalcEnemyPath();
+        }
+
+        const pCell = pxToCell(player.x, player.y);
+        if (pCell.r !== lastPlayerCellR || pCell.c !== lastPlayerCellC ||
+          enemyWpIdx >= enemyWaypoints.length) {
+          lastPlayerCellR = pCell.r;
+          lastPlayerCellC = pCell.c;
+          recalcEnemyPath();
+        }
+
+        const prevEX = enemy.x, prevEY = enemy.y;
+
+        if (enemyWaypoints.length > 0 && enemyWpIdx < enemyWaypoints.length) {
+          let remaining = currentEnemySpeed * dt;
+          while (remaining > 0.1 && enemyWpIdx < enemyWaypoints.length) {
+            const target = enemyWaypoints[enemyWpIdx];
+            const tdx = target.x - enemy.x;
+            const tdy = target.y - enemy.y;
+            const dist = Math.sqrt(tdx * tdx + tdy * tdy);
+
+            if (dist < 1) {
+              enemy.x = target.x;
+              enemy.y = target.y;
+              enemyWpIdx++;
+              continue;
+            }
+
+            if (Math.abs(tdx) > Math.abs(tdy)) {
+              enemy.dir = tdx > 0 ? 0 : 2;
+            } else {
+              enemy.dir = tdy > 0 ? 1 : 3;
+            }
+
+            if (dist <= remaining) {
+              enemy.x = target.x;
+              enemy.y = target.y;
+              remaining -= dist;
+              enemyWpIdx++;
+            } else {
+              enemy.x += (tdx / dist) * remaining;
+              enemy.y += (tdy / dist) * remaining;
+              remaining = 0;
+            }
+          }
+        }
+
+        const eCell = pxToCell(enemy.x, enemy.y);
+        const pCell2 = pxToCell(player.x, player.y);
+        if (eCell.r === pCell2.r && eCell.c === pCell2.c && enemyWpIdx >= enemyWaypoints.length) {
+          const tdx = player.x - enemy.x;
+          const tdy = player.y - enemy.y;
+          const dist = Math.sqrt(tdx * tdx + tdy * tdy);
+          if (dist > 1) {
+            const move = Math.min(currentEnemySpeed * dt, dist);
+            enemy.x += (tdx / dist) * move;
+            enemy.y += (tdy / dist) * move;
+            if (Math.abs(tdx) > Math.abs(tdy)) {
+              enemy.dir = tdx > 0 ? 0 : 2;
+            } else {
+              enemy.dir = tdy > 0 ? 1 : 3;
+            }
+          }
+        }
+
+        const movedDist = Math.sqrt((enemy.x - prevEX) ** 2 + (enemy.y - prevEY) ** 2);
+        enemyMoving = movedDist > 0.5;
+
+        if (enemyVariant.sprite && enemyMoving) {
+          spriteAnimTimer += dt;
+          if (spriteAnimTimer >= 1 / SPRITE_ANIM_FPS) {
+            spriteAnimTimer -= 1 / SPRITE_ANIM_FPS;
+            spriteAnimFrame = (spriteAnimFrame + 1) % 4;
+          }
+        }
+
+        // ---- COLLISION ----
+        const pLeft = player.x - PW / 2, pRight = player.x + PW / 2;
+        const pTop = player.y - PH / 2, pBottom = player.y + PH / 2;
+        const eLeft = enemy.x - EW / 2, eRight = enemy.x + EW / 2;
+        const eTop = enemy.y - EH / 2, eBottom = enemy.y + EH / 2;
+        if (pLeft < eRight && pRight > eLeft && pTop < eBottom && pBottom > eTop) {
+          lost = true;
+        }
+      }
+    }
+
+    // ============ PRE-RENDER ============
+    const mazeCanvas = document.createElement('canvas');
+    mazeCanvas.width = MAP_PX; mazeCanvas.height = MAP_PX;
+    const mctx = mazeCanvas.getContext('2d');
+    mctx.clearRect(0, 0, MAP_PX, MAP_PX);
+    mctx.fillStyle = '#2d2d4e';
+    for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++)
+      if (map[y * MAP + x] === 0) mctx.fillRect(x * T, y * T, T, T);
+    mctx.fillStyle = '#f0e6d3';
+    for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++)
+      if (map[y * MAP + x] === 1) mctx.fillRect(x * T, y * T, T, T);
+    mctx.strokeStyle = 'rgba(0,0,0,0.05)'; mctx.lineWidth = 0.5;
+    for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++)
+      if (map[y * MAP + x] === 1) mctx.strokeRect(x * T, y * T, T, T);
+    for (let y = 0; y < MAP; y++) {
+      for (let x = 0; x < MAP; x++) {
+        if (map[y * MAP + x] === 0) continue;
+        const px = x * T, py = y * T;
+        if (x > 0 && map[y * MAP + (x - 1)] === 0) { mctx.fillStyle = 'rgba(0,0,0,0.12)'; mctx.fillRect(px, py, 2, T); }
+        if (x < MAP - 1 && map[y * MAP + (x + 1)] === 0) { mctx.fillStyle = 'rgba(0,0,0,0.06)'; mctx.fillRect(px + T - 2, py, 2, T); }
+        if (y > 0 && map[(y - 1) * MAP + x] === 0) { mctx.fillStyle = 'rgba(0,0,0,0.12)'; mctx.fillRect(px, py, T, 2); }
+        if (y < MAP - 1 && map[(y + 1) * MAP + x] === 0) { mctx.fillStyle = 'rgba(0,0,0,0.06)'; mctx.fillRect(px, py + T - 2, T, 2); }
+      }
+    }
+
+    // ============ DRAW ENEMY FUNCTIONS ============
+    function drawEnemyBox(enX, enY) {
+      const v = enemyVariant;
+      const enHW = EW / 2, enHH = EH / 2;
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
+      ctx.beginPath(); ctx.ellipse(enX + 1, enY + enHH + 3, enHW * 0.85, 5, 0, 0, Math.PI * 2); ctx.fill();
+      const ebr = 5;
+      ctx.fillStyle = v.body; ctx.beginPath();
+      ctx.moveTo(enX - enHW + ebr, enY - enHH); ctx.lineTo(enX + enHW - ebr, enY - enHH);
+      ctx.quadraticCurveTo(enX + enHW, enY - enHH, enX + enHW, enY - enHH + ebr);
+      ctx.lineTo(enX + enHW, enY + enHH - ebr); ctx.quadraticCurveTo(enX + enHW, enY + enHH, enX + enHW - ebr, enY + enHH);
+      ctx.lineTo(enX - enHW + ebr, enY + enHH); ctx.quadraticCurveTo(enX - enHW, enY + enHH, enX - enHW, enY + enHH - ebr);
+      ctx.lineTo(enX - enHW, enY - enHH + ebr); ctx.quadraticCurveTo(enX - enHW, enY - enHH, enX - enHW + ebr, enY - enHH);
+      ctx.closePath(); ctx.fill(); ctx.strokeStyle = v.stroke; ctx.lineWidth = 2; ctx.stroke();
+
+      // Bloomie boost glow
+      if (enemyVariant.name === 'Miss Bloomie' && bloomieState === 'boosted') {
+        ctx.shadowColor = '#4287f5';
+        ctx.shadowBlur = 20;
+        ctx.strokeStyle = '#80b3ff';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+
+      let eox = 0, eoy = 0;
+      if (enemy.dir === 0) eox = 3; else if (enemy.dir === 2) eox = -3;
+      if (enemy.dir === 1) eoy = 3; else if (enemy.dir === 3) eoy = -3;
+      const efaceY = enY - enHH * 0.3;
+      ctx.fillStyle = v.eye;
+      ctx.beginPath(); ctx.arc(enX - 10 + eox, efaceY + eoy, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(enX + 10 + eox, efaceY + eoy, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.arc(enX - 9 + eox * 1.5, efaceY + eoy * 1.2, 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(enX + 11 + eox * 1.5, efaceY + eoy * 1.2, 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(enX - 17 + eox, efaceY - 8 + eoy); ctx.lineTo(enX - 4 + eox, efaceY - 4 + eoy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(enX + 17 + eox, efaceY - 8 + eoy); ctx.lineTo(enX + 4 + eox, efaceY - 4 + eoy); ctx.stroke();
+      ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(enX - 8 + eox * 0.5, efaceY + 18 + eoy * 0.5);
+      ctx.lineTo(enX - 3, efaceY + 14 + eoy * 0.5);
+      ctx.lineTo(enX + 3, efaceY + 18 + eoy * 0.5);
+      ctx.lineTo(enX + 8, efaceY + 14 + eoy * 0.5); ctx.stroke();
+    }
+
+    function drawEnemySprite(enX, enY) {
+      const sp = enemyVariant.sprite;
+      const frame = sp.frames[spriteAnimFrame];
+      if (!frame || !frame.complete || frame.naturalWidth === 0) {
+        drawEnemyBox(enX, enY);
+        return;
+      }
+
+      const natW = frame.naturalWidth;
+      const natH = frame.naturalHeight;
+      const scale = Math.min(EW / natW, EH / natH);
+      const drawW = natW * scale;
+      const drawH = natH * scale;
+
+      const flipLeft = (enemy.dir === 2);
+
+      ctx.save();
+
+      // Bloomie boost glow on sprite
+      if (enemyVariant.name === 'Miss Bloomie' && bloomieState === 'boosted') {
+        ctx.shadowColor = '#4287f5';
+        ctx.shadowBlur = 20;
+      }
+
+      if (flipLeft) {
+        ctx.translate(enX, enY);
+        ctx.scale(-1, 1);
+        ctx.drawImage(frame, -drawW / 2, -drawH / 2, drawW, drawH);
+      } else {
+        ctx.drawImage(frame, enX - drawW / 2, enY - drawH / 2, drawW, drawH);
+      }
+      ctx.restore();
+    }
+
+    function drawEnemy(enX, enY) {
+      // Draw Circle's aura
+      if (enemyVariant.name === 'Miss Circle' && enemy.active) {
+        const auraPulse = Math.sin(Date.now() / 400) * 0.03 + 0.08;
+        ctx.fillStyle = `rgba(139, 69, 166, ${auraPulse})`;
+        ctx.beginPath();
+        ctx.arc(enX, enY, CIRCLE_AURA_RADIUS, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(139, 69, 166, ${auraPulse + 0.1})`;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 6]);
+        ctx.beginPath();
+        ctx.arc(enX, enY, CIRCLE_AURA_RADIUS, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      if (enemyVariant.sprite) {
+        drawEnemySprite(enX, enY);
+      } else {
+        drawEnemyBox(enX, enY);
+      }
+    }
+
+    function render() {
+      const W = canvas.width, H = canvas.height;
+      const camX = player.x - W / 2, camY = player.y - H / 2;
+      ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0, 0, W, H);
+      const sx = Math.max(0, camX), sy = Math.max(0, camY);
+      const sw = Math.min(W, MAP_PX - sx), sh = Math.min(H, MAP_PX - sy);
+      const ddx = Math.max(0, -camX), ddy = Math.max(0, -camY);
+      if (sw > 0 && sh > 0) ctx.drawImage(mazeCanvas, sx, sy, sw, sh, ddx, ddy, sw, sh);
+
+      // EXIT
+      const exSX = exitX - camX, exSY = exitY - camY;
+      const pulse = Math.sin(Date.now() / 300) * 0.3 + 0.7;
+      ctx.globalAlpha = pulse; ctx.fillStyle = '#4caf50';
+      ctx.beginPath(); ctx.arc(exSX, exSY, exitR, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1; ctx.fillStyle = '#fff'; ctx.font = 'bold 18px Arial';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('EXIT', exSX, exSY);
+
+      // START
+      const stSX = startTX * T - camX, stSY = startTY * T - camY;
+      ctx.fillStyle = 'rgba(100,149,237,0.2)';
+      ctx.beginPath(); ctx.arc(stSX, stSY, exitR, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#6495ED'; ctx.font = '13px Arial';
+      ctx.fillText('START', stSX, stSY);
+
+      // ENEMY
+      if (enemy.active) {
+        drawEnemy(enemy.x - camX, enemy.y - camY);
+      }
+
+      // PLAYER
+      const ppx = W / 2, ppy = H / 2, phw = PW / 2, phh = PH / 2;
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      ctx.beginPath(); ctx.ellipse(ppx + 1, ppy + phh + 3, phw * 0.8, 4, 0, 0, Math.PI * 2); ctx.fill();
+      const br = 4;
+
+      let bodyColor = '#ff6b6b';
+      let strokeColor = '#c0392b';
+      if (playerStunned) {
+        const flash = Math.sin(Date.now() / 50) > 0;
+        bodyColor = flash ? '#ffff00' : '#ff6b6b';
+        strokeColor = flash ? '#cccc00' : '#c0392b';
+      } else if (playerSlowed) {
+        bodyColor = '#b05555';
+        strokeColor = '#8b3333';
+      }
+
+      ctx.fillStyle = bodyColor; ctx.beginPath();
+      ctx.moveTo(ppx - phw + br, ppy - phh); ctx.lineTo(ppx + phw - br, ppy - phh);
+      ctx.quadraticCurveTo(ppx + phw, ppy - phh, ppx + phw, ppy - phh + br);
+      ctx.lineTo(ppx + phw, ppy + phh - br); ctx.quadraticCurveTo(ppx + phw, ppy + phh, ppx + phw - br, ppy + phh);
+      ctx.lineTo(ppx - phw + br, ppy + phh); ctx.quadraticCurveTo(ppx - phw, ppy + phh, ppx - phw, ppy + phh - br);
+      ctx.lineTo(ppx - phw, ppy - phh + br); ctx.quadraticCurveTo(ppx - phw, ppy - phh, ppx - phw + br, ppy - phh);
+      ctx.closePath(); ctx.fill(); ctx.strokeStyle = strokeColor; ctx.lineWidth = 2; ctx.stroke();
+      let peox = 0, peoy = 0;
+      if (player.dir === 0) peox = 2; else if (player.dir === 2) peox = -2;
+      if (player.dir === 1) peoy = 3; else if (player.dir === 3) peoy = -3;
+      const pfaceY = ppy - phh * 0.35;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(ppx - 6 + peox, pfaceY + peoy, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ppx + 6 + peox, pfaceY + peoy, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#222';
+      ctx.beginPath(); ctx.arc(ppx - 5 + peox * 1.5, pfaceY + peoy * 1.2, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ppx + 7 + peox * 1.5, pfaceY + peoy * 1.2, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = strokeColor; ctx.lineWidth = 1.5; ctx.beginPath();
+      ctx.arc(ppx + peox * 0.5, pfaceY + 12 + peoy * 0.5, 4, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke();
+
+      // HUD
+      ctx.fillStyle = '#fff'; ctx.font = '16px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillText(`⏱ ${elapsed}s`, 15, 15);
+
+      if (playerStunned) {
+        ctx.fillStyle = '#ffff00'; ctx.font = 'bold 14px Arial';
+        ctx.fillText('⚡ STUNNED', 15, 38);
+      } else if (playerSlowed) {
+        ctx.fillStyle = '#8b45a6'; ctx.font = 'bold 14px Arial';
+        ctx.fillText('⚠ SLOWED', 15, 38);
+      }
+
+      // Bloomie state indicator
+      if (enemy.active && enemyVariant.name === 'Miss Bloomie') {
+        let stateText = '';
+        let stateColor = '#fff';
+        if (bloomieState === 'boosted') {
+          stateText = `🔥 BLOOMIE BOOST! ${bloomieBoostTimer.toFixed(1)}s`;
+          stateColor = '#4287f5';
+        } else if (bloomieState === 'exhausted') {
+          stateText = `😮‍💨 Bloomie tired... ${bloomieExhaustTimer.toFixed(1)}s`;
+          stateColor = '#7ab0ff';
+        }
+        if (stateText) {
+          ctx.fillStyle = stateColor; ctx.font = 'bold 14px Arial';
+          ctx.fillText(stateText, 15, 38);
+        }
+      }
+
+      const elapsedSec = (Date.now() - startTime) / 1000;
+      if (!enemy.active) {
+        const secsLeft = Math.ceil(ENEMY_SPAWN_DELAY - elapsedSec);
+        const warning = `⚠️ ${enemyVariant.name.toUpperCase()} ENTERS IN ${secsLeft}...`;
+        ctx.fillStyle = enemyVariant.body; ctx.font = 'bold 20px Arial'; ctx.textAlign = 'center';
+        ctx.fillText(warning, W / 2, 60);
+      }
+
+      if (won) {
+        ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(0, 0, W, H);
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#4caf50'; ctx.font = 'bold 52px Arial';
+        ctx.fillText('🎉 YOU WIN! 🎉', W / 2, H / 2 - 30);
+        ctx.fillStyle = '#fff'; ctx.font = '24px Arial';
+        ctx.fillText(`Escaped ${enemyVariant.name} in ${elapsed} seconds!`, W / 2, H / 2 + 25);
+        ctx.fillStyle = '#aaa'; ctx.font = '18px Arial';
+        ctx.fillText('Refresh to play again', W / 2, H / 2 + 60);
+      }
+
+      if (lost) {
+        ctx.fillStyle = 'rgba(80,0,0,0.8)'; ctx.fillRect(0, 0, W, H);
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = enemyVariant.body; ctx.font = 'bold 52px Arial';
+        ctx.fillText(`💀 ${enemyVariant.name.toUpperCase()}! 💀`, W / 2, H / 2 - 30);
+        ctx.fillStyle = '#fff'; ctx.font = '24px Arial';
+        ctx.fillText(`Caught after ${elapsed} seconds`, W / 2, H / 2 + 25);
+        ctx.fillStyle = '#aaa'; ctx.font = '18px Arial';
+        ctx.fillText('Refresh to try again', W / 2, H / 2 + 60);
+      }
+    }
+
+    function loop() { update(); render(); requestAnimationFrame(loop); }
+    loop();
+  </script>
+</body>
+
+</html>
