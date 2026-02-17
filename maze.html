@@ -184,6 +184,7 @@
         body: '#4287f5', stroke: '#2b5fad', eye: '#fff',
         minimap: '#4287f5', weight: 0.40,
         speed: 18 * T, w: 6 * T, h: 6 * T,
+        drawW: 8 * T, drawH: 8 * T,
         sprite: bloomieSprite
       },
       {
@@ -191,6 +192,7 @@
         body: '#3da34d', stroke: '#2a7535', eye: '#ffd700',
         minimap: '#3da34d', weight: 0.40,
         speed: 16 * T, w: 8 * T, h: 7 * T,
+        drawW: 10 * T, drawH: 9 * T,
         sprite: thavelSprite
       }
     ];
@@ -787,7 +789,9 @@
         drawW = natW * baseScale;
         drawH = natH * baseScale;
       } else {
-        const scale = Math.min(EW / natW, EH / natH);
+        const visW = enemyVariant.drawW || EW;
+        const visH = enemyVariant.drawH || EH;
+        const scale = Math.min(visW / natW, visH / natH);
         drawW = natW * scale;
         drawH = natH * scale;
       }
