@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Maze Runner</title>
+  <title>Fundamental Paper Education: Maze</title>
   <style>
     * {
       margin: 0;
@@ -47,13 +47,6 @@
       return (seed >>> 0) / 4294967296;
     }
     function rngInt(n) { return Math.floor(rng() * n); }
-    function rngShuffle(arr) {
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = rngInt(i + 1);
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-      }
-      return arr;
-    }
 
     const B = 3;
     const WALL_W = 3;
@@ -121,8 +114,8 @@
       }
     }
 
-    function chooseExitCorner(masterSeed) {
-      let s = masterSeed;
+    function chooseExitCorner(ms) {
+      let s = ms;
       s ^= s << 13; s ^= s >> 17; s ^= s << 5;
       const roll = (s >>> 0) / 4294967296;
       if (roll < 0.50) return 'bottom-right';
@@ -147,7 +140,6 @@
     const bloomieSprite = loadFrames('bloomie', 4);
     const circleSprite = loadFrames('circle', 4, 'png');
 
-    // Circle's max native frame dimensions for consistent scaling
     const CIRCLE_MAX_NAT_W = 568;
     const CIRCLE_MAX_NAT_H = 528;
 
@@ -156,14 +148,11 @@
     let spriteAnimFrame = 0;
 
     // ============ ABILITY CONSTANTS ============
-    // Circle
     const CIRCLE_AURA_RADIUS = 20 * T;
     const CIRCLE_SLOW_AMOUNT = 3 * T;
-    // Thavel
     const THAVEL_STUN_RADIUS = 20 * T;
-    const THAVEL_STUN_DURATION = 0.5;
+    const THAVEL_STUN_DURATION = 0.75;
     const THAVEL_STUN_COOLDOWN = 10;
-    // Bloomie
     const BLOOMIE_BOOST_AMOUNT = 2 * T;
     const BLOOMIE_BOOST_DURATION = 5;
     const BLOOMIE_SLOW_AMOUNT = 1 * T;
@@ -174,7 +163,7 @@
       {
         name: 'Miss Circle',
         body: '#cc2222', stroke: '#991111', eye: '#ff0',
-        minimap: '#cc2222', weight: 0.20,
+        minimap: '#cc2222', weight: 1 / 3,
         speed: 16 * T, w: 9 * T, h: 10 * T,
         drawW: 13 * T, drawH: 14 * T,
         sprite: circleSprite
@@ -182,7 +171,7 @@
       {
         name: 'Miss Bloomie',
         body: '#4287f5', stroke: '#2b5fad', eye: '#fff',
-        minimap: '#4287f5', weight: 0.40,
+        minimap: '#4287f5', weight: 1 / 3,
         speed: 18 * T, w: 6 * T, h: 6 * T,
         drawW: 8 * T, drawH: 8 * T,
         sprite: bloomieSprite
@@ -190,15 +179,15 @@
       {
         name: 'Miss Thavel',
         body: '#3da34d', stroke: '#2a7535', eye: '#ffd700',
-        minimap: '#3da34d', weight: 0.40,
+        minimap: '#3da34d', weight: 1 / 3,
         speed: 16 * T, w: 8 * T, h: 7 * T,
         drawW: 10 * T, drawH: 9 * T,
         sprite: thavelSprite
       }
     ];
 
-    function chooseEnemyVariant(masterSeed) {
-      let s = masterSeed * 2654435761 | 0;
+    function chooseEnemyVariant(ms) {
+      let s = ms * 2654435761 | 0;
       s ^= s << 13; s ^= s >> 17; s ^= s << 5;
       const roll = (s >>> 0) / 4294967296;
       let cumulative = 0;
@@ -449,69 +438,244 @@
       return false;
     }
 
-    const masterSeed = Date.now();
-    const exitCorner = chooseExitCorner(masterSeed);
-    const enemyVariant = chooseEnemyVariant(masterSeed);
-
     function getNonExitCorners() {
       const allCorners = ['top-right', 'bottom-left', 'bottom-right'];
       return allCorners.filter(name => name !== exitCorner);
     }
 
-    let chosenSeed = 0;
-    for (let attempt = 0; attempt < 500; attempt++) {
-      const trySeed = (Math.random() * 2147483647) | 0;
-      generateMaze(trySeed);
-      const nonExitCorners = getNonExitCorners();
-      let allReachable = true;
-      for (const cornerName of nonExitCorners) {
-        const corner = getCornerPos(cornerName);
-        if (!bfsReachable(startTX, startTY, corner.x, corner.y, exitTX, exitTY)) {
-          allReachable = false;
-          break;
+    // ============ PRE-RENDER MAZE ============
+    const mazeCanvas = document.createElement('canvas');
+    mazeCanvas.width = MAP_PX; mazeCanvas.height = MAP_PX;
+    const mctx = mazeCanvas.getContext('2d');
+
+    function preRenderMaze() {
+      mctx.clearRect(0, 0, MAP_PX, MAP_PX);
+      mctx.fillStyle = '#2d2d4e';
+      for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++)
+        if (map[y * MAP + x] === 0) mctx.fillRect(x * T, y * T, T, T);
+      mctx.fillStyle = '#f0e6d3';
+      for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++)
+        if (map[y * MAP + x] === 1) mctx.fillRect(x * T, y * T, T, T);
+      mctx.strokeStyle = 'rgba(0,0,0,0.05)'; mctx.lineWidth = 0.5;
+      for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++)
+        if (map[y * MAP + x] === 1) mctx.strokeRect(x * T, y * T, T, T);
+      for (let y = 0; y < MAP; y++) {
+        for (let x = 0; x < MAP; x++) {
+          if (map[y * MAP + x] === 0) continue;
+          const px = x * T, py = y * T;
+          if (x > 0 && map[y * MAP + (x - 1)] === 0) { mctx.fillStyle = 'rgba(0,0,0,0.12)'; mctx.fillRect(px, py, 2, T); }
+          if (x < MAP - 1 && map[y * MAP + (x + 1)] === 0) { mctx.fillStyle = 'rgba(0,0,0,0.06)'; mctx.fillRect(px + T - 2, py, 2, T); }
+          if (y > 0 && map[(y - 1) * MAP + x] === 0) { mctx.fillStyle = 'rgba(0,0,0,0.12)'; mctx.fillRect(px, py, T, 2); }
+          if (y < MAP - 1 && map[(y + 1) * MAP + x] === 0) { mctx.fillStyle = 'rgba(0,0,0,0.06)'; mctx.fillRect(px, py + T - 2, T, 2); }
         }
-      }
-      if (allReachable && findDeadEnds().length === 3) {
-        chosenSeed = trySeed;
-        break;
       }
     }
 
-    function countWalls() { let n = 0; for (let i = 0; i < MAP * MAP; i++) if (map[i] === 0) n++; return n; }
-    const wallPct = (countWalls() / (MAP * MAP) * 100).toFixed(1);
-    console.log(`Seed: ${chosenSeed}, Exit: ${exitCorner}, Enemy: ${enemyVariant.name}, Wall coverage: ${wallPct}%, Dead ends: ${findDeadEnds().length}`);
+    // ============ GAME STATE ============
+    let gameState = 'menu';
 
-    // ============ PLAYER ============
+    let exitCorner, enemyVariant, EW, EH, BASE_ENEMY_SPEED, currentEnemySpeed;
     const PW = 3 * T, PH = 5 * T;
     const PLAYER_SPEED = 18 * T;
-    const player = { x: startTX * T, y: startTY * T, dir: 0 };
-    const exitX = exitTX * T, exitY = exitTY * T, exitR = 3 * T;
+    const ENEMY_SPAWN_DELAY = 5;
+    const player = { x: 0, y: 0, dir: 0 };
+    let exitX, exitY;
+    const exitR = 3 * T;
     let playerSlowed = false;
     let playerStunned = false;
     let stunTimer = 0;
-
-    // ============ THAVEL STUN TRACKING ============
     let thavelStunCooldown = 0;
-
-    // ============ BLOOMIE ABILITY TRACKING ============
     let bloomieState = 'ready';
     let bloomieBoostTimer = 0;
     let bloomieExhaustTimer = 0;
     let bloomieCooldown = 0;
-
-    // ============ ENEMY ============
-    const EW = enemyVariant.w;
-    const EH = enemyVariant.h;
-    const BASE_ENEMY_SPEED = enemyVariant.speed;
-    let currentEnemySpeed = BASE_ENEMY_SPEED;
-    const ENEMY_SPAWN_DELAY = 5;
-    const enemy = { x: startTX * T, y: startTY * T, active: false, dir: 0 };
-
+    const enemy = { x: 0, y: 0, active: false, dir: 0 };
     let enemyWaypoints = [];
     let enemyWpIdx = 0;
     let lastPlayerCellR = -1, lastPlayerCellC = -1;
     let enemyMoving = false;
+    let won = false, lost = false, startTime = 0, elapsed = '0.0';
 
+    function startGame() {
+      const masterSeed = Date.now();
+      exitCorner = chooseExitCorner(masterSeed);
+      enemyVariant = chooseEnemyVariant(masterSeed);
+      EW = enemyVariant.w;
+      EH = enemyVariant.h;
+      BASE_ENEMY_SPEED = enemyVariant.speed;
+      currentEnemySpeed = BASE_ENEMY_SPEED;
+
+      let chosenSeed = 0;
+      for (let attempt = 0; attempt < 500; attempt++) {
+        const trySeed = (Math.random() * 2147483647) | 0;
+        generateMaze(trySeed);
+        const nonExitCorners = getNonExitCorners();
+        let allReachable = true;
+        for (const cornerName of nonExitCorners) {
+          const corner = getCornerPos(cornerName);
+          if (!bfsReachable(startTX, startTY, corner.x, corner.y, exitTX, exitTY)) {
+            allReachable = false;
+            break;
+          }
+        }
+        if (allReachable && findDeadEnds().length === 3) {
+          chosenSeed = trySeed;
+          break;
+        }
+      }
+
+      preRenderMaze();
+
+      player.x = startTX * T;
+      player.y = startTY * T;
+      player.dir = 0;
+      exitX = exitTX * T;
+      exitY = exitTY * T;
+      playerSlowed = false;
+      playerStunned = false;
+      stunTimer = 0;
+      thavelStunCooldown = 0;
+      bloomieState = 'ready';
+      bloomieBoostTimer = 0;
+      bloomieExhaustTimer = 0;
+      bloomieCooldown = 0;
+      enemy.x = startTX * T;
+      enemy.y = startTY * T;
+      enemy.active = false;
+      enemy.dir = 0;
+      enemyWaypoints = [];
+      enemyWpIdx = 0;
+      lastPlayerCellR = -1;
+      lastPlayerCellC = -1;
+      enemyMoving = false;
+      spriteAnimTimer = 0;
+      spriteAnimFrame = 0;
+      won = false;
+      lost = false;
+      startTime = Date.now();
+      elapsed = '0.0';
+      gameState = 'playing';
+
+      console.log(`Seed: ${chosenSeed}, Exit: ${exitCorner}, Enemy: ${enemyVariant.name}`);
+    }
+
+    // ============ MENU ============
+    const menuButtons = [
+      { label: 'Tutorial', active: false },
+      { label: 'Play', active: false },
+      { label: 'Randomize', active: true },
+      { label: 'Enemies', active: false }
+    ];
+
+    let mouseX = 0, mouseY = 0;
+    canvas.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
+
+    function getButtonRects() {
+      const W = canvas.width, H = canvas.height;
+      const btnW = 280, btnH = 50, gap = 18;
+      const startY = H / 2 + 20;
+      return menuButtons.map((btn, i) => ({
+        x: W / 2 - btnW / 2,
+        y: startY + i * (btnH + gap),
+        w: btnW,
+        h: btnH,
+        ...btn
+      }));
+    }
+
+    function getHoveredButton() {
+      const rects = getButtonRects();
+      for (const r of rects) {
+        if (mouseX >= r.x && mouseX <= r.x + r.w && mouseY >= r.y && mouseY <= r.y + r.h) return r;
+      }
+      return null;
+    }
+
+    canvas.addEventListener('click', () => {
+      if (gameState === 'menu') {
+        const btn = getHoveredButton();
+        if (btn && btn.active) {
+          if (btn.label === 'Randomize') startGame();
+        }
+      }
+    });
+
+    function renderMenu() {
+      const W = canvas.width, H = canvas.height;
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(0, 0, W, H);
+
+      // Title
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#f0e6d3';
+      ctx.font = 'bold 42px Arial';
+      ctx.fillText('Fundamental Paper Education', W / 2, H / 2 - 120);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 56px Arial';
+      ctx.fillText('MAZE', W / 2, H / 2 - 60);
+
+      // Buttons
+      const rects = getButtonRects();
+      const hovered = getHoveredButton();
+      for (const r of rects) {
+        const isHovered = hovered && hovered.label === r.label;
+        const isActive = r.active;
+
+        if (!isActive) {
+          ctx.fillStyle = '#2a2a3e';
+          ctx.strokeStyle = '#444';
+        } else if (isHovered) {
+          ctx.fillStyle = '#5a5a7e';
+          ctx.strokeStyle = '#888';
+        } else {
+          ctx.fillStyle = '#3a3a5e';
+          ctx.strokeStyle = '#666';
+        }
+
+        const br = 10;
+        ctx.beginPath();
+        ctx.moveTo(r.x + br, r.y);
+        ctx.lineTo(r.x + r.w - br, r.y);
+        ctx.quadraticCurveTo(r.x + r.w, r.y, r.x + r.w, r.y + br);
+        ctx.lineTo(r.x + r.w, r.y + r.h - br);
+        ctx.quadraticCurveTo(r.x + r.w, r.y + r.h, r.x + r.w - br, r.y + r.h);
+        ctx.lineTo(r.x + br, r.y + r.h);
+        ctx.quadraticCurveTo(r.x, r.y + r.h, r.x, r.y + r.h - br);
+        ctx.lineTo(r.x, r.y + br);
+        ctx.quadraticCurveTo(r.x, r.y, r.x + br, r.y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.fillStyle = isActive ? '#fff' : '#666';
+        ctx.font = 'bold 22px Arial';
+        ctx.fillText(r.label, r.x + r.w / 2, r.y + r.h / 2);
+
+        if (!isActive) {
+          ctx.fillStyle = '#555';
+          ctx.font = '12px Arial';
+          ctx.fillText('coming soon', r.x + r.w / 2, r.y + r.h / 2 + 18);
+        }
+      }
+    }
+
+    // ============ INPUT ============
+    const keys = {};
+    document.addEventListener('keydown', e => {
+      keys[e.key] = true;
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+      if (e.key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        if (gameState === 'won' || gameState === 'lost' || gameState === 'playing') {
+          startGame();
+        }
+      }
+    });
+    document.addEventListener('keyup', e => { keys[e.key] = false; });
+
+    // ============ PATHFINDING ============
     function recalcEnemyPath() {
       const eCell = pxToCell(enemy.x, enemy.y);
       const pCell = pxToCell(player.x, player.y);
@@ -534,14 +698,7 @@
         isFloor(px - hw, py) && isFloor(px + hw, py);
     }
 
-    const keys = {};
-    document.addEventListener('keydown', e => {
-      keys[e.key] = true;
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
-    });
-    document.addEventListener('keyup', e => { keys[e.key] = false; });
-
-    let won = false, lost = false, startTime = Date.now(), elapsed = '0.0';
+    // ============ UPDATE ============
     let lastTime = performance.now();
 
     function update() {
@@ -549,26 +706,21 @@
       const dt = Math.min((now - lastTime) / 1000, 1 / 15);
       lastTime = now;
 
+      if (gameState !== 'playing') return;
       if (won || lost) return;
       const elapsedSec = (Date.now() - startTime) / 1000;
       elapsed = elapsedSec.toFixed(1);
 
-      // ---- TICK DOWN STUN ----
       if (stunTimer > 0) {
         stunTimer -= dt;
-        if (stunTimer <= 0) {
-          stunTimer = 0;
-          playerStunned = false;
-        }
+        if (stunTimer <= 0) { stunTimer = 0; playerStunned = false; }
       }
 
-      // ---- TICK DOWN THAVEL COOLDOWN ----
       if (thavelStunCooldown > 0) {
         thavelStunCooldown -= dt;
         if (thavelStunCooldown < 0) thavelStunCooldown = 0;
       }
 
-      // ---- BLOOMIE ABILITY STATE MACHINE ----
       if (enemy.active && enemyVariant.name === 'Miss Bloomie') {
         if (bloomieState === 'ready') {
           bloomieState = 'boosted';
@@ -589,53 +741,32 @@
           }
         } else if (bloomieState === 'cooldown') {
           bloomieCooldown -= dt;
-          if (bloomieCooldown <= 0) {
-            bloomieCooldown = 0;
-            bloomieState = 'ready';
-          }
+          if (bloomieCooldown <= 0) { bloomieCooldown = 0; bloomieState = 'ready'; }
         }
-
-        if (bloomieState === 'boosted') {
-          currentEnemySpeed = BASE_ENEMY_SPEED + BLOOMIE_BOOST_AMOUNT;
-        } else if (bloomieState === 'exhausted') {
-          currentEnemySpeed = BASE_ENEMY_SPEED - BLOOMIE_SLOW_AMOUNT;
-        } else {
-          currentEnemySpeed = BASE_ENEMY_SPEED;
-        }
+        if (bloomieState === 'boosted') currentEnemySpeed = BASE_ENEMY_SPEED + BLOOMIE_BOOST_AMOUNT;
+        else if (bloomieState === 'exhausted') currentEnemySpeed = BASE_ENEMY_SPEED - BLOOMIE_SLOW_AMOUNT;
+        else currentEnemySpeed = BASE_ENEMY_SPEED;
       } else {
         currentEnemySpeed = BASE_ENEMY_SPEED;
       }
 
-      // ---- CHECK CIRCLE AURA ----
       playerSlowed = false;
       if (enemy.active && enemyVariant.name === 'Miss Circle') {
-        const adx = player.x - enemy.x;
-        const ady = player.y - enemy.y;
-        const auraDist = Math.sqrt(adx * adx + ady * ady);
-        if (auraDist <= CIRCLE_AURA_RADIUS) {
-          playerSlowed = true;
-        }
+        const adx = player.x - enemy.x, ady = player.y - enemy.y;
+        if (Math.sqrt(adx * adx + ady * ady) <= CIRCLE_AURA_RADIUS) playerSlowed = true;
       }
 
-      // ---- CHECK THAVEL STUN ----
       if (enemy.active && enemyVariant.name === 'Miss Thavel' && thavelStunCooldown <= 0 && !playerStunned) {
-        const adx = player.x - enemy.x;
-        const ady = player.y - enemy.y;
-        const dist = Math.sqrt(adx * adx + ady * ady);
-        if (dist <= THAVEL_STUN_RADIUS) {
+        const adx = player.x - enemy.x, ady = player.y - enemy.y;
+        if (Math.sqrt(adx * adx + ady * ady) <= THAVEL_STUN_RADIUS) {
           playerStunned = true;
           stunTimer = THAVEL_STUN_DURATION;
           thavelStunCooldown = THAVEL_STUN_COOLDOWN;
         }
       }
 
-      // ---- PLAYER MOVEMENT ----
       if (!playerStunned) {
-        let currentSpeed = PLAYER_SPEED;
-        if (playerSlowed) {
-          currentSpeed = PLAYER_SPEED - CIRCLE_SLOW_AMOUNT;
-        }
-
+        let currentSpeed = playerSlowed ? PLAYER_SPEED - CIRCLE_SLOW_AMOUNT : PLAYER_SPEED;
         let dx = 0, dy = 0;
         if (keys['ArrowUp'] || keys['w'] || keys['W']) dy -= 1;
         if (keys['ArrowDown'] || keys['s'] || keys['S']) dy += 1;
@@ -644,29 +775,21 @@
         if (dx > 0) player.dir = 0; else if (dx < 0) player.dir = 2;
         if (dy > 0) player.dir = 1; else if (dy < 0) player.dir = 3;
         if (dx !== 0 && dy !== 0) { dx *= 0.7071; dy *= 0.7071; }
-        const moveX = dx * currentSpeed * dt;
-        const moveY = dy * currentSpeed * dt;
+        const moveX = dx * currentSpeed * dt, moveY = dy * currentSpeed * dt;
         const hw = PW / 2 - 1, hh = PH / 2 - 1;
         if (canMove(player.x + moveX, player.y, hw, hh)) player.x += moveX;
         if (canMove(player.x, player.y + moveY, hw, hh)) player.y += moveY;
       }
 
-      // ---- WIN CHECK ----
       const wx = player.x - exitX, wy = player.y - exitY;
-      if (Math.sqrt(wx * wx + wy * wy) < exitR) won = true;
+      if (Math.sqrt(wx * wx + wy * wy) < exitR) { won = true; gameState = 'won'; return; }
 
-      // ---- ENEMY ----
       if (elapsedSec >= ENEMY_SPAWN_DELAY) {
-        if (!enemy.active) {
-          enemy.active = true;
-          recalcEnemyPath();
-        }
+        if (!enemy.active) { enemy.active = true; recalcEnemyPath(); }
 
         const pCell = pxToCell(player.x, player.y);
-        if (pCell.r !== lastPlayerCellR || pCell.c !== lastPlayerCellC ||
-          enemyWpIdx >= enemyWaypoints.length) {
-          lastPlayerCellR = pCell.r;
-          lastPlayerCellC = pCell.c;
+        if (pCell.r !== lastPlayerCellR || pCell.c !== lastPlayerCellC || enemyWpIdx >= enemyWaypoints.length) {
+          lastPlayerCellR = pCell.r; lastPlayerCellC = pCell.c;
           recalcEnemyPath();
         }
 
@@ -676,51 +799,26 @@
           let remaining = currentEnemySpeed * dt;
           while (remaining > 0.1 && enemyWpIdx < enemyWaypoints.length) {
             const target = enemyWaypoints[enemyWpIdx];
-            const tdx = target.x - enemy.x;
-            const tdy = target.y - enemy.y;
+            const tdx = target.x - enemy.x, tdy = target.y - enemy.y;
             const dist = Math.sqrt(tdx * tdx + tdy * tdy);
-
-            if (dist < 1) {
-              enemy.x = target.x;
-              enemy.y = target.y;
-              enemyWpIdx++;
-              continue;
-            }
-
-            if (Math.abs(tdx) > Math.abs(tdy)) {
-              enemy.dir = tdx > 0 ? 0 : 2;
-            } else {
-              enemy.dir = tdy > 0 ? 1 : 3;
-            }
-
-            if (dist <= remaining) {
-              enemy.x = target.x;
-              enemy.y = target.y;
-              remaining -= dist;
-              enemyWpIdx++;
-            } else {
-              enemy.x += (tdx / dist) * remaining;
-              enemy.y += (tdy / dist) * remaining;
-              remaining = 0;
-            }
+            if (dist < 1) { enemy.x = target.x; enemy.y = target.y; enemyWpIdx++; continue; }
+            if (Math.abs(tdx) > Math.abs(tdy)) enemy.dir = tdx > 0 ? 0 : 2;
+            else enemy.dir = tdy > 0 ? 1 : 3;
+            if (dist <= remaining) { enemy.x = target.x; enemy.y = target.y; remaining -= dist; enemyWpIdx++; }
+            else { enemy.x += (tdx / dist) * remaining; enemy.y += (tdy / dist) * remaining; remaining = 0; }
           }
         }
 
         const eCell = pxToCell(enemy.x, enemy.y);
         const pCell2 = pxToCell(player.x, player.y);
         if (eCell.r === pCell2.r && eCell.c === pCell2.c && enemyWpIdx >= enemyWaypoints.length) {
-          const tdx = player.x - enemy.x;
-          const tdy = player.y - enemy.y;
+          const tdx = player.x - enemy.x, tdy = player.y - enemy.y;
           const dist = Math.sqrt(tdx * tdx + tdy * tdy);
           if (dist > 1) {
             const move = Math.min(currentEnemySpeed * dt, dist);
-            enemy.x += (tdx / dist) * move;
-            enemy.y += (tdy / dist) * move;
-            if (Math.abs(tdx) > Math.abs(tdy)) {
-              enemy.dir = tdx > 0 ? 0 : 2;
-            } else {
-              enemy.dir = tdy > 0 ? 1 : 3;
-            }
+            enemy.x += (tdx / dist) * move; enemy.y += (tdy / dist) * move;
+            if (Math.abs(tdx) > Math.abs(tdy)) enemy.dir = tdx > 0 ? 0 : 2;
+            else enemy.dir = tdy > 0 ? 1 : 3;
           }
         }
 
@@ -735,81 +833,39 @@
           }
         }
 
-        // ---- COLLISION ----
         const pLeft = player.x - PW / 2, pRight = player.x + PW / 2;
         const pTop = player.y - PH / 2, pBottom = player.y + PH / 2;
         const eLeft = enemy.x - EW / 2, eRight = enemy.x + EW / 2;
         const eTop = enemy.y - EH / 2, eBottom = enemy.y + EH / 2;
         if (pLeft < eRight && pRight > eLeft && pTop < eBottom && pBottom > eTop) {
-          lost = true;
+          lost = true; gameState = 'lost';
         }
       }
     }
 
-    // ============ PRE-RENDER ============
-    const mazeCanvas = document.createElement('canvas');
-    mazeCanvas.width = MAP_PX; mazeCanvas.height = MAP_PX;
-    const mctx = mazeCanvas.getContext('2d');
-    mctx.clearRect(0, 0, MAP_PX, MAP_PX);
-    mctx.fillStyle = '#2d2d4e';
-    for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++)
-      if (map[y * MAP + x] === 0) mctx.fillRect(x * T, y * T, T, T);
-    mctx.fillStyle = '#f0e6d3';
-    for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++)
-      if (map[y * MAP + x] === 1) mctx.fillRect(x * T, y * T, T, T);
-    mctx.strokeStyle = 'rgba(0,0,0,0.05)'; mctx.lineWidth = 0.5;
-    for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++)
-      if (map[y * MAP + x] === 1) mctx.strokeRect(x * T, y * T, T, T);
-    for (let y = 0; y < MAP; y++) {
-      for (let x = 0; x < MAP; x++) {
-        if (map[y * MAP + x] === 0) continue;
-        const px = x * T, py = y * T;
-        if (x > 0 && map[y * MAP + (x - 1)] === 0) { mctx.fillStyle = 'rgba(0,0,0,0.12)'; mctx.fillRect(px, py, 2, T); }
-        if (x < MAP - 1 && map[y * MAP + (x + 1)] === 0) { mctx.fillStyle = 'rgba(0,0,0,0.06)'; mctx.fillRect(px + T - 2, py, 2, T); }
-        if (y > 0 && map[(y - 1) * MAP + x] === 0) { mctx.fillStyle = 'rgba(0,0,0,0.12)'; mctx.fillRect(px, py, T, 2); }
-        if (y < MAP - 1 && map[(y + 1) * MAP + x] === 0) { mctx.fillStyle = 'rgba(0,0,0,0.06)'; mctx.fillRect(px, py + T - 2, T, 2); }
-      }
-    }
-
-    // ============ DRAW ENEMY FUNCTIONS ============
+    // ============ DRAW ENEMY ============
     function drawEnemySprite(enX, enY) {
       const sp = enemyVariant.sprite;
       const frame = sp.frames[spriteAnimFrame];
       if (!frame || !frame.complete || frame.naturalWidth === 0) return;
-
-      const natW = frame.naturalWidth;
-      const natH = frame.naturalHeight;
-
+      const natW = frame.naturalWidth, natH = frame.naturalHeight;
       let drawW, drawH;
       if (enemyVariant.name === 'Miss Circle') {
-        // Use consistent scale based on largest frame + larger visual draw size
-        const visW = enemyVariant.drawW;
-        const visH = enemyVariant.drawH;
+        const visW = enemyVariant.drawW, visH = enemyVariant.drawH;
         const baseScale = Math.min(visW / CIRCLE_MAX_NAT_W, visH / CIRCLE_MAX_NAT_H);
-        drawW = natW * baseScale;
-        drawH = natH * baseScale;
+        drawW = natW * baseScale; drawH = natH * baseScale;
       } else {
-        const visW = enemyVariant.drawW || EW;
-        const visH = enemyVariant.drawH || EH;
+        const visW = enemyVariant.drawW || EW, visH = enemyVariant.drawH || EH;
         const scale = Math.min(visW / natW, visH / natH);
-        drawW = natW * scale;
-        drawH = natH * scale;
+        drawW = natW * scale; drawH = natH * scale;
       }
-
-
       const flipLeft = (enemyVariant.name === 'Miss Circle') ? (enemy.dir === 0) : (enemy.dir === 2);
-
       ctx.save();
-
-      // Bloomie boost glow on sprite
       if (enemyVariant.name === 'Miss Bloomie' && bloomieState === 'boosted') {
-        ctx.shadowColor = '#4287f5';
-        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#4287f5'; ctx.shadowBlur = 20;
       }
-
       if (flipLeft) {
-        ctx.translate(enX, enY);
-        ctx.scale(-1, 1);
+        ctx.translate(enX, enY); ctx.scale(-1, 1);
         ctx.drawImage(frame, -drawW / 2, -drawH / 2, drawW, drawH);
       } else {
         ctx.drawImage(frame, enX - drawW / 2, enY - drawH / 2, drawW, drawH);
@@ -818,26 +874,20 @@
     }
 
     function drawEnemy(enX, enY) {
-      // Draw Circle's red aura
       if (enemyVariant.name === 'Miss Circle' && enemy.active) {
         const auraPulse = Math.sin(Date.now() / 400) * 0.03 + 0.08;
         ctx.fillStyle = `rgba(204, 34, 34, ${auraPulse})`;
-        ctx.beginPath();
-        ctx.arc(enX, enY, CIRCLE_AURA_RADIUS, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(enX, enY, CIRCLE_AURA_RADIUS, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = `rgba(204, 34, 34, ${auraPulse + 0.1})`;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([8, 6]);
-        ctx.beginPath();
-        ctx.arc(enX, enY, CIRCLE_AURA_RADIUS, 0, Math.PI * 2);
-        ctx.stroke();
+        ctx.lineWidth = 2; ctx.setLineDash([8, 6]);
+        ctx.beginPath(); ctx.arc(enX, enY, CIRCLE_AURA_RADIUS, 0, Math.PI * 2); ctx.stroke();
         ctx.setLineDash([]);
       }
-
       drawEnemySprite(enX, enY);
     }
 
-    function render() {
+    // ============ RENDER GAME ============
+    function renderGame() {
       const W = canvas.width, H = canvas.height;
       const camX = player.x - W / 2, camY = player.y - H / 2;
       ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0, 0, W, H);
@@ -846,7 +896,6 @@
       const ddx = Math.max(0, -camX), ddy = Math.max(0, -camY);
       if (sw > 0 && sh > 0) ctx.drawImage(mazeCanvas, sx, sy, sw, sh, ddx, ddy, sw, sh);
 
-      // EXIT
       const exSX = exitX - camX, exSY = exitY - camY;
       const pulse = Math.sin(Date.now() / 300) * 0.3 + 0.7;
       ctx.globalAlpha = pulse; ctx.fillStyle = '#4caf50';
@@ -855,35 +904,20 @@
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('EXIT', exSX, exSY);
 
-      // START
       const stSX = startTX * T - camX, stSY = startTY * T - camY;
       ctx.fillStyle = 'rgba(100,149,237,0.2)';
       ctx.beginPath(); ctx.arc(stSX, stSY, exitR, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#6495ED'; ctx.font = '13px Arial';
       ctx.fillText('START', stSX, stSY);
 
-      // ENEMY
-      if (enemy.active) {
-        drawEnemy(enemy.x - camX, enemy.y - camY);
-      }
+      if (enemy.active) drawEnemy(enemy.x - camX, enemy.y - camY);
 
-      // PLAYER
       const ppx = W / 2, ppy = H / 2, phw = PW / 2, phh = PH / 2;
       ctx.fillStyle = 'rgba(0,0,0,0.15)';
       ctx.beginPath(); ctx.ellipse(ppx + 1, ppy + phh + 3, phw * 0.8, 4, 0, 0, Math.PI * 2); ctx.fill();
       const br = 4;
-
-      let bodyColor = '#ff6b6b';
-      let strokeColor = '#c0392b';
-      if (playerStunned) {
-        const flash = Math.sin(Date.now() / 50) > 0;
-        bodyColor = flash ? '#ffff00' : '#ff6b6b';
-        strokeColor = flash ? '#cccc00' : '#c0392b';
-      } else if (playerSlowed) {
-        bodyColor = '#b05555';
-        strokeColor = '#8b3333';
-      }
-
+      const bodyColor = '#ff6b6b';
+      const strokeColor = '#c0392b';
       ctx.fillStyle = bodyColor; ctx.beginPath();
       ctx.moveTo(ppx - phw + br, ppy - phh); ctx.lineTo(ppx + phw - br, ppy - phh);
       ctx.quadraticCurveTo(ppx + phw, ppy - phh, ppx + phw, ppy - phh + br);
@@ -904,6 +938,22 @@
       ctx.strokeStyle = strokeColor; ctx.lineWidth = 1.5; ctx.beginPath();
       ctx.arc(ppx + peox * 0.5, pfaceY + 12 + peoy * 0.5, 4, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke();
 
+      // STUN HALO
+      if (playerStunned) {
+        const haloY = ppy - phh - 10;
+        const spinSpeed = Date.now() / 300;
+        const starCount = 5;
+        const haloRadius = 20;
+        ctx.font = '14px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        for (let i = 0; i < starCount; i++) {
+          const angle = spinSpeed + (i * Math.PI * 2 / starCount);
+          const ssx = ppx + Math.cos(angle) * haloRadius;
+          const ssy = haloY + Math.sin(angle) * (haloRadius * 0.4);
+          ctx.fillStyle = '#ffdd00';
+          ctx.fillText('⭐', ssx, ssy);
+        }
+      }
+
       // HUD
       ctx.fillStyle = '#fff'; ctx.font = '16px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
       ctx.fillText(`⏱ ${elapsed}s`, 15, 15);
@@ -916,32 +966,24 @@
         ctx.fillText('⚠ SLOWED', 15, 38);
       }
 
-      // Bloomie state indicator
       if (enemy.active && enemyVariant.name === 'Miss Bloomie') {
-        let stateText = '';
-        let stateColor = '#fff';
+        let stateText = '', stateColor = '#fff';
         if (bloomieState === 'boosted') {
-          stateText = `🔥 BLOOMIE BOOST! ${bloomieBoostTimer.toFixed(1)}s`;
-          stateColor = '#4287f5';
+          stateText = `🔥 BLOOMIE BOOST! ${bloomieBoostTimer.toFixed(1)}s`; stateColor = '#4287f5';
         } else if (bloomieState === 'exhausted') {
-          stateText = `😮‍💨 Bloomie tired... ${bloomieExhaustTimer.toFixed(1)}s`;
-          stateColor = '#7ab0ff';
+          stateText = `😮‍💨 Bloomie tired... ${bloomieExhaustTimer.toFixed(1)}s`; stateColor = '#7ab0ff';
         }
-        if (stateText) {
-          ctx.fillStyle = stateColor; ctx.font = 'bold 14px Arial';
-          ctx.fillText(stateText, 15, 38);
-        }
+        if (stateText) { ctx.fillStyle = stateColor; ctx.font = 'bold 14px Arial'; ctx.fillText(stateText, 15, 38); }
       }
 
       const elapsedSec = (Date.now() - startTime) / 1000;
       if (!enemy.active) {
         const secsLeft = Math.ceil(ENEMY_SPAWN_DELAY - elapsedSec);
-        const warning = `⚠️ ${enemyVariant.name.toUpperCase()} ENTERS IN ${secsLeft}...`;
         ctx.fillStyle = enemyVariant.body; ctx.font = 'bold 20px Arial'; ctx.textAlign = 'center';
-        ctx.fillText(warning, W / 2, 60);
+        ctx.fillText(`⚠️ ${enemyVariant.name.toUpperCase()} ENTERS IN ${secsLeft}...`, W / 2, 60);
       }
 
-      if (won) {
+      if (gameState === 'won') {
         ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(0, 0, W, H);
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillStyle = '#4caf50'; ctx.font = 'bold 52px Arial';
@@ -949,10 +991,10 @@
         ctx.fillStyle = '#fff'; ctx.font = '24px Arial';
         ctx.fillText(`Escaped ${enemyVariant.name} in ${elapsed} seconds!`, W / 2, H / 2 + 25);
         ctx.fillStyle = '#aaa'; ctx.font = '18px Arial';
-        ctx.fillText('Refresh to play again', W / 2, H / 2 + 60);
+        ctx.fillText('Press SPACE for new round', W / 2, H / 2 + 65);
       }
 
-      if (lost) {
+      if (gameState === 'lost') {
         ctx.fillStyle = 'rgba(80,0,0,0.8)'; ctx.fillRect(0, 0, W, H);
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillStyle = enemyVariant.body; ctx.font = 'bold 52px Arial';
@@ -960,11 +1002,17 @@
         ctx.fillStyle = '#fff'; ctx.font = '24px Arial';
         ctx.fillText(`Caught after ${elapsed} seconds`, W / 2, H / 2 + 25);
         ctx.fillStyle = '#aaa'; ctx.font = '18px Arial';
-        ctx.fillText('Refresh to try again', W / 2, H / 2 + 60);
+        ctx.fillText('Press SPACE for new round', W / 2, H / 2 + 65);
       }
     }
 
-    function loop() { update(); render(); requestAnimationFrame(loop); }
+    // ============ MAIN LOOP ============
+    function loop() {
+      update();
+      if (gameState === 'menu') renderMenu();
+      else renderGame();
+      requestAnimationFrame(loop);
+    }
     loop();
   </script>
 </body>
