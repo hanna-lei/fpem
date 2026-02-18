@@ -38,17 +38,19 @@
     resize();
     window.addEventListener('resize', resize);
 
+    // ============ PAUSE ON TAB SWITCH ============
+    let pausedAt = 0;
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) {
-        lastTime = performance.now();
-        if (gameState === 'playing') {
+      if (document.hidden) {
+        pausedAt = Date.now();
+      } else {
+        if (pausedAt > 0 && gameState === 'playing') {
           startTime += Date.now() - pausedAt;
         }
-      } else {
-        pausedAt = Date.now();
+        lastTime = performance.now();
+        pausedAt = 0;
       }
     });
-    let pausedAt = 0;
 
     const T = 15;
     const MAP = 100;
@@ -164,7 +166,7 @@
     const CIRCLE_AURA_RADIUS = 20 * T;
     const CIRCLE_SLOW_AMOUNT = 3 * T;
     const THAVEL_STUN_RADIUS = 30 * T;
-    const THAVEL_STUN_DURATION = 0.75;
+    const THAVEL_STUN_DURATION = 0.5;
     const THAVEL_STUN_COOLDOWN = 10;
     const BLOOMIE_BOOST_AMOUNT = 2 * T;
     const BLOOMIE_BOOST_DURATION = 5;
@@ -509,6 +511,14 @@
     let enemyMoving = false;
     let won = false, lost = false, startTime = 0, elapsed = '0.0';
 
+    // ============ STAMINA ============
+    const MAX_STAMINA = 100;
+    let stamina = MAX_STAMINA;
+    const STAMINA_DRAIN = 5;
+    const STAMINA_REGEN = 1;
+    const SPRINT_BOOST = 3 * T;
+    let sprinting = false;
+
     function startGame() {
       const masterSeed = Date.now();
       exitCorner = chooseExitCorner(masterSeed);
@@ -567,6 +577,8 @@
       lost = false;
       startTime = Date.now();
       elapsed = '0.0';
+      stamina = MAX_STAMINA;
+      sprinting = false;
       gameState = 'playing';
 
       console.log(`Seed: ${chosenSeed}, Exit: ${exitCorner}, Enemy: ${enemyVariant.name}`);
@@ -618,7 +630,6 @@
       ctx.fillStyle = '#1a1a2e';
       ctx.fillRect(0, 0, W, H);
 
-      // Title
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = '#f0e6d3';
@@ -628,7 +639,6 @@
       ctx.font = 'bold 56px Arial';
       ctx.fillText('MAZE', W / 2, H / 2 - 60);
 
-      // Buttons
       const rects = getButtonRects();
       const hovered = getHoveredButton();
       for (const r of rects) {
@@ -779,7 +789,17 @@
       }
 
       if (!playerStunned) {
+        // Sprint logic
+        sprinting = (keys['z'] || keys['Z']) && stamina > 0;
+        if (sprinting) {
+          stamina = Math.max(0, stamina - STAMINA_DRAIN * dt);
+        } else {
+          stamina = Math.min(MAX_STAMINA, stamina + STAMINA_REGEN * dt);
+        }
+
         let currentSpeed = playerSlowed ? PLAYER_SPEED - CIRCLE_SLOW_AMOUNT : PLAYER_SPEED;
+        if (sprinting) currentSpeed += SPRINT_BOOST;
+
         let dx = 0, dy = 0;
         if (keys['ArrowUp'] || keys['w'] || keys['W']) dy -= 1;
         if (keys['ArrowDown'] || keys['s'] || keys['S']) dy += 1;
@@ -792,6 +812,10 @@
         const hw = PW / 2 - 1, hh = PH / 2 - 1;
         if (canMove(player.x + moveX, player.y, hw, hh)) player.x += moveX;
         if (canMove(player.x, player.y + moveY, hw, hh)) player.y += moveY;
+      } else {
+        // Still regen stamina while stunned
+        stamina = Math.min(MAX_STAMINA, stamina + STAMINA_REGEN * dt);
+        sprinting = false;
       }
 
       const wx = player.x - exitX, wy = player.y - exitY;
@@ -971,12 +995,22 @@
       ctx.fillStyle = '#fff'; ctx.font = '16px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
       ctx.fillText(`⏱ ${elapsed}s`, 15, 15);
 
+      // Stamina bar
+      const barX = 15, barY = 36, barW = 120, barH = 10;
+      ctx.fillStyle = '#333';
+      ctx.fillRect(barX, barY, barW, barH);
+      ctx.fillStyle = sprinting ? '#ffaa00' : '#ffdd00';
+      ctx.fillRect(barX, barY, barW * (stamina / MAX_STAMINA), barH);
+      ctx.strokeStyle = '#888';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(barX, barY, barW, barH);
+
       if (playerStunned) {
         ctx.fillStyle = '#ffff00'; ctx.font = 'bold 14px Arial';
-        ctx.fillText('⚡ STUNNED', 15, 38);
+        ctx.fillText('⚡ STUNNED', 15, 54);
       } else if (playerSlowed) {
         ctx.fillStyle = '#cc2222'; ctx.font = 'bold 14px Arial';
-        ctx.fillText('⚠ SLOWED', 15, 38);
+        ctx.fillText('⚠ SLOWED', 15, 54);
       }
 
       if (enemy.active && enemyVariant.name === 'Miss Bloomie') {
@@ -986,7 +1020,7 @@
         } else if (bloomieState === 'exhausted') {
           stateText = `😮‍💨 Bloomie tired... ${bloomieExhaustTimer.toFixed(1)}s`; stateColor = '#7ab0ff';
         }
-        if (stateText) { ctx.fillStyle = stateColor; ctx.font = 'bold 14px Arial'; ctx.fillText(stateText, 15, 38); }
+        if (stateText) { ctx.fillStyle = stateColor; ctx.font = 'bold 14px Arial'; ctx.fillText(stateText, 15, 54); }
       }
 
       const elapsedSec = (Date.now() - startTime) / 1000;
