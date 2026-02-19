@@ -173,6 +173,12 @@
     const oreos = [];
     const inventory = [null, null, null];
 
+    // ============ INVINCIBILITY ============
+    let invincible = false;
+    let invincibleTimer = 0;
+    const INVINCIBLE_DURATION = 3;
+    const OREO_SPEED_BOOST = 5 * T;
+
     // ============ ABILITY CONSTANTS ============
     const CIRCLE_AURA_RADIUS = 20 * T;
     const CIRCLE_SLOW_AMOUNT = 2 * T;
@@ -598,6 +604,8 @@
       elapsed = '0.0';
       stamina = MAX_STAMINA;
       sprinting = false;
+      invincible = false;
+      invincibleTimer = 0;
       gameState = 'playing';
       bgMusic.play();
 
@@ -605,7 +613,7 @@
       inventory[0] = null; inventory[1] = null; inventory[2] = null;
       oreos.length = 0;
 
-      // Place 2 oreos in dead ends
+      // Place 2 oreos in dead ends (exclude start and exit cells)
       const startCell = pxToCell(startTX * T, startTY * T);
       const exitCell = pxToCell(exitX, exitY);
       const deadEnds = findDeadEnds().filter(([r, c]) =>
@@ -731,6 +739,16 @@
           startGame();
         }
       }
+      // Use inventory items
+      if ((e.key === 'a' || e.key === 'A') && gameState === 'playing') {
+        if (inventory[0] === 'oreo') { inventory[0] = null; invincible = true; invincibleTimer = INVINCIBLE_DURATION; }
+      }
+      if ((e.key === 's' || e.key === 'S') && gameState === 'playing') {
+        if (inventory[1] === 'oreo') { inventory[1] = null; invincible = true; invincibleTimer = INVINCIBLE_DURATION; }
+      }
+      if ((e.key === 'd' || e.key === 'D') && gameState === 'playing') {
+        if (inventory[2] === 'oreo') { inventory[2] = null; invincible = true; invincibleTimer = INVINCIBLE_DURATION; }
+      }
     });
     document.addEventListener('keyup', e => { keys[e.key] = false; });
 
@@ -779,6 +797,10 @@
         thavelStunCooldown -= dt;
         if (thavelStunCooldown < 0) thavelStunCooldown = 0;
       }
+      if (invincibleTimer > 0) {
+        invincibleTimer -= dt;
+        if (invincibleTimer <= 0) { invincibleTimer = 0; invincible = false; }
+      }
 
       if (enemy.active && enemyVariant.name === 'Miss Bloomie') {
         if (bloomieState === 'ready') {
@@ -826,10 +848,10 @@
 
       if (!playerStunned) {
         let dx = 0, dy = 0;
-        if (keys['ArrowUp'] || keys['w'] || keys['W']) dy -= 1;
-        if (keys['ArrowDown'] || keys['s'] || keys['S']) dy += 1;
-        if (keys['ArrowLeft'] || keys['a'] || keys['A']) dx -= 1;
-        if (keys['ArrowRight'] || keys['d'] || keys['D']) dx += 1;
+        if (keys['ArrowUp']) dy -= 1;
+        if (keys['ArrowDown']) dy += 1;
+        if (keys['ArrowLeft']) dx -= 1;
+        if (keys['ArrowRight']) dx += 1;
 
         // Sprint logic
         const isMoving = dx !== 0 || dy !== 0;
@@ -842,6 +864,7 @@
 
         let currentSpeed = playerSlowed ? PLAYER_SPEED - CIRCLE_SLOW_AMOUNT : PLAYER_SPEED;
         if (sprinting) currentSpeed += SPRINT_BOOST;
+        if (invincible) currentSpeed += OREO_SPEED_BOOST;
 
         if (dx > 0) player.dir = 0; else if (dx < 0) player.dir = 2;
         if (dy > 0) player.dir = 1; else if (dy < 0) player.dir = 3;
@@ -855,12 +878,12 @@
         sprinting = false;
       }
 
-      // Oreo pickup
+      // Oreo pickup (5 tiles wide, 4 tiles tall hitbox)
       for (const oreo of oreos) {
         if (oreo.collected) continue;
-        const odx = player.x - oreo.x, ody = player.y - oreo.y;
-        const oDist = Math.sqrt(odx * odx + ody * ody);
-        if (oDist < 2 * T) {
+        const odx = Math.abs(player.x - oreo.x);
+        const ody = Math.abs(player.y - oreo.y);
+        if (odx < 2.5 * T && ody < 2 * T) {
           const slot = inventory.indexOf(null);
           if (slot !== -1) {
             inventory[slot] = 'oreo';
@@ -923,7 +946,9 @@
         const eLeft = enemy.x - EW / 2, eRight = enemy.x + EW / 2;
         const eTop = enemy.y - EH / 2, eBottom = enemy.y + EH / 2;
         if (pLeft < eRight && pRight > eLeft && pTop < eBottom && pBottom > eTop) {
-          lost = true; gameState = 'lost'; bgMusic.pause();
+          if (!invincible) {
+            lost = true; gameState = 'lost'; bgMusic.pause();
+          }
         }
       }
     }
@@ -1011,13 +1036,21 @@
         }
       }
 
+      // Player
       const ppx = W / 2, ppy = H / 2, phw = PW / 2, phh = PH / 2;
       ctx.fillStyle = 'rgba(0,0,0,0.15)';
       ctx.beginPath(); ctx.ellipse(ppx + 1, ppy + phh + 3, phw * 0.8, 4, 0, 0, Math.PI * 2); ctx.fill();
 
+      // Invincibility glow
+      if (invincible) {
+        ctx.save();
+        ctx.shadowColor = '#ffdd00';
+        ctx.shadowBlur = 20;
+      }
+
       const br = 4;
-      const bodyColor = '#ff6b6b';
-      const strokeColor = '#c0392b';
+      const bodyColor = invincible ? '#ffd700' : '#ff6b6b';
+      const strokeColor = invincible ? '#daa520' : '#c0392b';
       ctx.fillStyle = bodyColor; ctx.beginPath();
       ctx.moveTo(ppx - phw + br, ppy - phh); ctx.lineTo(ppx + phw - br, ppy - phh);
       ctx.quadraticCurveTo(ppx + phw, ppy - phh, ppx + phw, ppy - phh + br);
@@ -1025,6 +1058,8 @@
       ctx.lineTo(ppx - phw + br, ppy + phh); ctx.quadraticCurveTo(ppx - phw, ppy + phh, ppx - phw, ppy + phh - br);
       ctx.lineTo(ppx - phw, ppy - phh + br); ctx.quadraticCurveTo(ppx - phw, ppy - phh, ppx - phw + br, ppy - phh);
       ctx.closePath(); ctx.fill(); ctx.strokeStyle = strokeColor; ctx.lineWidth = 2; ctx.stroke();
+
+      if (invincible) ctx.restore();
 
       let peox = 0, peoy = 0;
       if (player.dir === 0) peox = 2; else if (player.dir === 2) peox = -2;
@@ -1038,6 +1073,16 @@
       ctx.beginPath(); ctx.arc(ppx + 7 + peox * 1.5, pfaceY + peoy * 1.2, 2.5, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = strokeColor; ctx.lineWidth = 1.5; ctx.beginPath();
       ctx.arc(ppx + peox * 0.5, pfaceY + 12 + peoy * 0.5, 4, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke();
+
+      // Invincibility countdown number above head
+      if (invincible) {
+        const countNum = Math.ceil(invincibleTimer);
+        ctx.fillStyle = '#ffdd00';
+        ctx.font = 'bold 22px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(countNum, ppx, ppy - phh - 8);
+      }
 
       // STUN HALO
       if (playerStunned) {
