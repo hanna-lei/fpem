@@ -79,12 +79,10 @@
       hLines.push(p);
       vLines.push(p);
     }
-
     const rows = hLines.length - 1;
     const cols = vLines.length - 1;
 
     const DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-
     let hSegWall, vSegWall;
 
     function getCellOpenings(r, c) {
@@ -95,6 +93,7 @@
       if (c < cols - 1 && !vSegWall[r][c + 1]) o.push({ nr: r, nc: c + 1, type: 'v', wr: r, wc: c + 1 });
       return o;
     }
+
     function getClosedWalls(r, c) {
       const w = [];
       if (r > 0 && hSegWall[r][c]) w.push({ type: 'h', wr: r, wc: c });
@@ -103,6 +102,7 @@
       if (c < cols - 1 && vSegWall[r][c + 1]) w.push({ type: 'v', wr: r, wc: c + 1 });
       return w;
     }
+
     function findDeadEnds() {
       const de = [];
       for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++)
@@ -159,7 +159,6 @@
     const thavelSprite = loadFrames('thavel', 4);
     const bloomieSprite = loadFrames('bloomie', 4);
     const circleSprite = loadFrames('circle', 4, 'png');
-
     const CIRCLE_MAX_NAT_W = 568;
     const CIRCLE_MAX_NAT_H = 528;
 
@@ -167,9 +166,16 @@
     let spriteAnimTimer = 0;
     let spriteAnimFrame = 0;
 
+    // ============ OREO ============
+    const oreoImg = new Image();
+    oreoImg.src = 'imgs/oreo.png';
+    const OREO_TILE_W = 5;
+    const oreos = [];
+    const inventory = [null, null, null];
+
     // ============ ABILITY CONSTANTS ============
     const CIRCLE_AURA_RADIUS = 20 * T;
-    const CIRCLE_SLOW_AMOUNT = 3 * T;
+    const CIRCLE_SLOW_AMOUNT = 2 * T;
     const THAVEL_STUN_RADIUS = 30 * T;
     const THAVEL_STUN_DURATION = 0.5;
     const THAVEL_STUN_COOLDOWN = 10;
@@ -284,6 +290,7 @@
       const visited = Array.from({ length: rows }, () => new Uint8Array(cols).fill(0));
       visited[0][0] = 1;
       const frontier = [];
+
       function addFrontier(r, c) {
         for (const [dr, dc] of DIRS) {
           const nr = r + dr, nc = c + dc;
@@ -292,6 +299,7 @@
         }
       }
       addFrontier(0, 0);
+
       while (frontier.length > 0) {
         const idx = rngInt(frontier.length);
         const wall = frontier[idx];
@@ -332,6 +340,7 @@
               if (x >= 0 && x < MAP && y >= 0 && y < MAP) map[y * MAP + x] = 1;
         }
       }
+
       for (let r = 0; r < hLines.length; r++) {
         for (let c = 0; c < cols; c++) {
           if (hSegWall[r][c]) continue;
@@ -345,6 +354,7 @@
             }
         }
       }
+
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < vLines.length; c++) {
           if (vSegWall[r][c]) continue;
@@ -358,6 +368,7 @@
             }
         }
       }
+
       for (let r = 0; r < hLines.length; r++) {
         for (let c = 0; c < vLines.length; c++) {
           let hasAdjacentWall = false;
@@ -493,7 +504,6 @@
 
     // ============ GAME STATE ============
     let gameState = 'menu';
-
     let exitCorner, enemyVariant, EW, EH, BASE_ENEMY_SPEED, currentEnemySpeed;
     const PW = 3 * T, PH = 5 * T;
     const PLAYER_SPEED = 17 * T;
@@ -501,6 +511,7 @@
     const player = { x: 0, y: 0, dir: 0 };
     let exitX, exitY;
     const exitR = 3 * T;
+
     let playerSlowed = false;
     let playerStunned = false;
     let stunTimer = 0;
@@ -509,6 +520,7 @@
     let bloomieBoostTimer = 0;
     let bloomieExhaustTimer = 0;
     let bloomieCooldown = 0;
+
     const enemy = { x: 0, y: 0, active: false, dir: 0 };
     let enemyWaypoints = [];
     let enemyWpIdx = 0;
@@ -553,12 +565,12 @@
       }
 
       preRenderMaze();
-
       player.x = startTX * T;
       player.y = startTY * T;
       player.dir = 0;
       exitX = exitTX * T;
       exitY = exitTY * T;
+
       playerSlowed = false;
       playerStunned = false;
       stunTimer = 0;
@@ -567,6 +579,7 @@
       bloomieBoostTimer = 0;
       bloomieExhaustTimer = 0;
       bloomieCooldown = 0;
+
       enemy.x = startTX * T;
       enemy.y = startTY * T;
       enemy.active = false;
@@ -578,6 +591,7 @@
       enemyMoving = false;
       spriteAnimTimer = 0;
       spriteAnimFrame = 0;
+
       won = false;
       lost = false;
       startTime = Date.now();
@@ -585,8 +599,28 @@
       stamina = MAX_STAMINA;
       sprinting = false;
       gameState = 'playing';
-
       bgMusic.play();
+
+      // Reset inventory and oreos
+      inventory[0] = null; inventory[1] = null; inventory[2] = null;
+      oreos.length = 0;
+
+      // Place 2 oreos in dead ends
+      const startCell = pxToCell(startTX * T, startTY * T);
+      const exitCell = pxToCell(exitX, exitY);
+      const deadEnds = findDeadEnds().filter(([r, c]) =>
+        !(r === startCell.r && c === startCell.c) &&
+        !(r === exitCell.r && c === exitCell.c)
+      );
+      for (let i = deadEnds.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deadEnds[i], deadEnds[j]] = [deadEnds[j], deadEnds[i]];
+      }
+      const oreoPlacements = deadEnds.slice(0, 2);
+      for (const [r, c] of oreoPlacements) {
+        const center = cellCenterPx(r, c);
+        oreos.push({ x: center.x, y: center.y, collected: false });
+      }
 
       console.log(`Seed: ${chosenSeed}, Exit: ${exitCorner}, Enemy: ${enemyVariant.name}`);
     }
@@ -636,7 +670,6 @@
       const W = canvas.width, H = canvas.height;
       ctx.fillStyle = '#1a1a2e';
       ctx.fillRect(0, 0, W, H);
-
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = '#f0e6d3';
@@ -651,7 +684,6 @@
       for (const r of rects) {
         const isHovered = hovered && hovered.label === r.label;
         const isActive = r.active;
-
         if (!isActive) {
           ctx.fillStyle = '#2a2a3e';
           ctx.strokeStyle = '#444';
@@ -662,7 +694,6 @@
           ctx.fillStyle = '#3a3a5e';
           ctx.strokeStyle = '#666';
         }
-
         const br = 10;
         ctx.beginPath();
         ctx.moveTo(r.x + br, r.y);
@@ -678,11 +709,9 @@
         ctx.fill();
         ctx.lineWidth = 2;
         ctx.stroke();
-
         ctx.fillStyle = isActive ? '#fff' : '#666';
         ctx.font = 'bold 22px Arial';
         ctx.fillText(r.label, r.x + r.w / 2, r.y + r.h / 2);
-
         if (!isActive) {
           ctx.fillStyle = '#555';
           ctx.font = '12px Arial';
@@ -721,6 +750,7 @@
       if (tx < 0 || ty < 0 || tx >= MAP || ty >= MAP) return false;
       return map[ty * MAP + tx] === 1;
     }
+
     function canMove(px, py, hw, hh) {
       return isFloor(px - hw, py - hh) && isFloor(px + hw, py - hh) &&
         isFloor(px - hw, py + hh) && isFloor(px + hw, py + hh) &&
@@ -735,9 +765,9 @@
       const now = performance.now();
       const dt = Math.min((now - lastTime) / 1000, 1 / 15);
       lastTime = now;
-
       if (gameState !== 'playing') return;
       if (won || lost) return;
+
       const elapsedSec = (Date.now() - startTime) / 1000;
       elapsed = elapsedSec.toFixed(1);
 
@@ -745,7 +775,6 @@
         stunTimer -= dt;
         if (stunTimer <= 0) { stunTimer = 0; playerStunned = false; }
       }
-
       if (thavelStunCooldown > 0) {
         thavelStunCooldown -= dt;
         if (thavelStunCooldown < 0) thavelStunCooldown = 0;
@@ -796,8 +825,15 @@
       }
 
       if (!playerStunned) {
+        let dx = 0, dy = 0;
+        if (keys['ArrowUp'] || keys['w'] || keys['W']) dy -= 1;
+        if (keys['ArrowDown'] || keys['s'] || keys['S']) dy += 1;
+        if (keys['ArrowLeft'] || keys['a'] || keys['A']) dx -= 1;
+        if (keys['ArrowRight'] || keys['d'] || keys['D']) dx += 1;
+
         // Sprint logic
-        sprinting = (keys['z'] || keys['Z']) && stamina > 0;
+        const isMoving = dx !== 0 || dy !== 0;
+        sprinting = (keys['z'] || keys['Z']) && stamina > 0 && isMoving;
         if (sprinting) {
           stamina = Math.max(0, stamina - STAMINA_DRAIN * dt);
         } else {
@@ -807,11 +843,6 @@
         let currentSpeed = playerSlowed ? PLAYER_SPEED - CIRCLE_SLOW_AMOUNT : PLAYER_SPEED;
         if (sprinting) currentSpeed += SPRINT_BOOST;
 
-        let dx = 0, dy = 0;
-        if (keys['ArrowUp'] || keys['w'] || keys['W']) dy -= 1;
-        if (keys['ArrowDown'] || keys['s'] || keys['S']) dy += 1;
-        if (keys['ArrowLeft'] || keys['a'] || keys['A']) dx -= 1;
-        if (keys['ArrowRight'] || keys['d'] || keys['D']) dx += 1;
         if (dx > 0) player.dir = 0; else if (dx < 0) player.dir = 2;
         if (dy > 0) player.dir = 1; else if (dy < 0) player.dir = 3;
         if (dx !== 0 && dy !== 0) { dx *= 0.7071; dy *= 0.7071; }
@@ -820,9 +851,22 @@
         if (canMove(player.x + moveX, player.y, hw, hh)) player.x += moveX;
         if (canMove(player.x, player.y + moveY, hw, hh)) player.y += moveY;
       } else {
-        // Still regen stamina while stunned
         stamina = Math.min(MAX_STAMINA, stamina + STAMINA_REGEN * dt);
         sprinting = false;
+      }
+
+      // Oreo pickup
+      for (const oreo of oreos) {
+        if (oreo.collected) continue;
+        const odx = player.x - oreo.x, ody = player.y - oreo.y;
+        const oDist = Math.sqrt(odx * odx + ody * ody);
+        if (oDist < 2 * T) {
+          const slot = inventory.indexOf(null);
+          if (slot !== -1) {
+            inventory[slot] = 'oreo';
+            oreo.collected = true;
+          }
+        }
       }
 
       const wx = player.x - exitX, wy = player.y - exitY;
@@ -830,7 +874,6 @@
 
       if (elapsedSec >= ENEMY_SPAWN_DELAY) {
         if (!enemy.active) { enemy.active = true; recalcEnemyPath(); }
-
         const pCell = pxToCell(player.x, player.y);
         if (pCell.r !== lastPlayerCellR || pCell.c !== lastPlayerCellC || enemyWpIdx >= enemyWaypoints.length) {
           lastPlayerCellR = pCell.r; lastPlayerCellC = pCell.c;
@@ -838,7 +881,6 @@
         }
 
         const prevEX = enemy.x, prevEY = enemy.y;
-
         if (enemyWaypoints.length > 0 && enemyWpIdx < enemyWaypoints.length) {
           let remaining = currentEnemySpeed * dt;
           while (remaining > 0.1 && enemyWpIdx < enemyWaypoints.length) {
@@ -868,7 +910,6 @@
 
         const movedDist = Math.sqrt((enemy.x - prevEX) ** 2 + (enemy.y - prevEY) ** 2);
         enemyMoving = movedDist > 0.5;
-
         if (enemyVariant.sprite && enemyMoving) {
           spriteAnimTimer += dt;
           if (spriteAnimTimer >= 1 / SPRITE_ANIM_FPS) {
@@ -934,7 +975,9 @@
     function renderGame() {
       const W = canvas.width, H = canvas.height;
       const camX = player.x - W / 2, camY = player.y - H / 2;
+
       ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0, 0, W, H);
+
       const sx = Math.max(0, camX), sy = Math.max(0, camY);
       const sw = Math.min(W, MAP_PX - sx), sh = Math.min(H, MAP_PX - sy);
       const ddx = Math.max(0, -camX), ddy = Math.max(0, -camY);
@@ -956,9 +999,22 @@
 
       if (enemy.active) drawEnemy(enemy.x - camX, enemy.y - camY);
 
+      // Draw oreos on map
+      if (oreoImg.complete && oreoImg.naturalWidth > 0) {
+        const oreoDrawW = OREO_TILE_W * T;
+        const oreoDrawH = (oreoImg.naturalHeight / oreoImg.naturalWidth) * oreoDrawW;
+        for (const oreo of oreos) {
+          if (oreo.collected) continue;
+          const ox = oreo.x - camX - oreoDrawW / 2;
+          const oy = oreo.y - camY - oreoDrawH / 2;
+          ctx.drawImage(oreoImg, ox, oy, oreoDrawW, oreoDrawH);
+        }
+      }
+
       const ppx = W / 2, ppy = H / 2, phw = PW / 2, phh = PH / 2;
       ctx.fillStyle = 'rgba(0,0,0,0.15)';
       ctx.beginPath(); ctx.ellipse(ppx + 1, ppy + phh + 3, phw * 0.8, 4, 0, 0, Math.PI * 2); ctx.fill();
+
       const br = 4;
       const bodyColor = '#ff6b6b';
       const strokeColor = '#c0392b';
@@ -969,6 +1025,7 @@
       ctx.lineTo(ppx - phw + br, ppy + phh); ctx.quadraticCurveTo(ppx - phw, ppy + phh, ppx - phw, ppy + phh - br);
       ctx.lineTo(ppx - phw, ppy - phh + br); ctx.quadraticCurveTo(ppx - phw, ppy - phh, ppx - phw + br, ppy - phh);
       ctx.closePath(); ctx.fill(); ctx.strokeStyle = strokeColor; ctx.lineWidth = 2; ctx.stroke();
+
       let peox = 0, peoy = 0;
       if (player.dir === 0) peox = 2; else if (player.dir === 2) peox = -2;
       if (player.dir === 1) peoy = 3; else if (player.dir === 3) peoy = -3;
@@ -1014,7 +1071,7 @@
 
       // Inventory slots
       const invY = barY + barH + 8;
-      const invRadius = 12;
+      const invRadius = 24;
       const invGap = 10;
       for (let i = 0; i < 3; i++) {
         const cx = barX + invRadius + i * (invRadius * 2 + invGap);
@@ -1026,16 +1083,22 @@
         ctx.strokeStyle = 'rgba(150, 150, 150, 0.6)';
         ctx.lineWidth = 1.5;
         ctx.stroke();
+
+        // Draw item in slot
+        if (inventory[i] === 'oreo' && oreoImg.complete && oreoImg.naturalWidth > 0) {
+          const iconW = invRadius * 1.4;
+          const iconH = (oreoImg.naturalHeight / oreoImg.naturalWidth) * iconW;
+          ctx.drawImage(oreoImg, cx - iconW / 2, cy - iconH / 2, iconW, iconH);
+        }
       }
 
-
-
-
       const elapsedSec = (Date.now() - startTime) / 1000;
-      if (!enemy.active) {
-        const secsLeft = Math.ceil(ENEMY_SPAWN_DELAY - elapsedSec);
-        ctx.fillStyle = enemyVariant.body; ctx.font = 'bold 20px Arial'; ctx.textAlign = 'center';
-        ctx.fillText(`⚠️ ${enemyVariant.name.toUpperCase()} ENTERS IN ${secsLeft}...`, W / 2, 60);
+      if (!enemy.active && gameState === 'playing') {
+        const secsLeft = Math.max(0, Math.ceil(ENEMY_SPAWN_DELAY - elapsedSec));
+        if (secsLeft > 0) {
+          ctx.fillStyle = enemyVariant.body; ctx.font = 'bold 20px Arial'; ctx.textAlign = 'center';
+          ctx.fillText(`⚠️ ${enemyVariant.name.toUpperCase()} ENTERS IN ${secsLeft}...`, W / 2, 60);
+        }
       }
 
       if (gameState === 'won') {
