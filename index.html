@@ -1012,23 +1012,24 @@
       ctx.lineWidth = 1;
       ctx.strokeRect(barX, barY, barW, barH);
 
-      if (playerStunned) {
-        ctx.fillStyle = '#ffff00'; ctx.font = 'bold 14px Arial';
-        ctx.fillText('⚡ STUNNED', 15, 54);
-      } else if (playerSlowed) {
-        ctx.fillStyle = '#cc2222'; ctx.font = 'bold 14px Arial';
-        ctx.fillText('⚠ SLOWED', 15, 54);
+      // Inventory slots
+      const invY = barY + barH + 8;
+      const invRadius = 12;
+      const invGap = 10;
+      for (let i = 0; i < 3; i++) {
+        const cx = barX + invRadius + i * (invRadius * 2 + invGap);
+        const cy = invY + invRadius;
+        ctx.beginPath();
+        ctx.arc(cx, cy, invRadius, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(80, 80, 80, 0.5)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(150, 150, 150, 0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
       }
 
-      if (enemy.active && enemyVariant.name === 'Miss Bloomie') {
-        let stateText = '', stateColor = '#fff';
-        if (bloomieState === 'boosted') {
-          stateText = `🔥 BLOOMIE BOOST! ${bloomieBoostTimer.toFixed(1)}s`; stateColor = '#4287f5';
-        } else if (bloomieState === 'exhausted') {
-          stateText = `😮‍💨 Bloomie tired... ${bloomieExhaustTimer.toFixed(1)}s`; stateColor = '#7ab0ff';
-        }
-        if (stateText) { ctx.fillStyle = stateColor; ctx.font = 'bold 14px Arial'; ctx.fillText(stateText, 15, 54); }
-      }
+
+
 
       const elapsedSec = (Date.now() - startTime) / 1000;
       if (!enemy.active) {
