@@ -38,6 +38,11 @@
     resize();
     window.addEventListener('resize', resize);
 
+    // ============ AUDIO ============
+    const bgMusic = new Audio('audio/audioprojectfpemaze.mp3');
+    bgMusic.loop = true;
+    bgMusic.volume = 0.5;
+
     // ============ PAUSE ON TAB SWITCH ============
     let pausedAt = 0;
     document.addEventListener('visibilitychange', () => {
@@ -581,6 +586,8 @@
       sprinting = false;
       gameState = 'playing';
 
+      bgMusic.play();
+
       console.log(`Seed: ${chosenSeed}, Exit: ${exitCorner}, Enemy: ${enemyVariant.name}`);
     }
 
@@ -819,7 +826,7 @@
       }
 
       const wx = player.x - exitX, wy = player.y - exitY;
-      if (Math.sqrt(wx * wx + wy * wy) < exitR) { won = true; gameState = 'won'; return; }
+      if (Math.sqrt(wx * wx + wy * wy) < exitR) { won = true; gameState = 'won'; bgMusic.pause(); return; }
 
       if (elapsedSec >= ENEMY_SPAWN_DELAY) {
         if (!enemy.active) { enemy.active = true; recalcEnemyPath(); }
@@ -875,7 +882,7 @@
         const eLeft = enemy.x - EW / 2, eRight = enemy.x + EW / 2;
         const eTop = enemy.y - EH / 2, eBottom = enemy.y + EH / 2;
         if (pLeft < eRight && pRight > eLeft && pTop < eBottom && pBottom > eTop) {
-          lost = true; gameState = 'lost';
+          lost = true; gameState = 'lost'; bgMusic.pause();
         }
       }
     }
