@@ -831,19 +831,27 @@
         currentEnemySpeed = BASE_ENEMY_SPEED;
       }
 
+      // Miss Circle aura slow — blocked by invincibility
       playerSlowed = false;
-      if (enemy.active && enemyVariant.name === 'Miss Circle') {
+      if (enemy.active && enemyVariant.name === 'Miss Circle' && !invincible) {
         const adx = player.x - enemy.x, ady = player.y - enemy.y;
         if (Math.sqrt(adx * adx + ady * ady) <= CIRCLE_AURA_RADIUS) playerSlowed = true;
       }
 
-      if (enemy.active && enemyVariant.name === 'Miss Thavel' && thavelStunCooldown <= 0 && !playerStunned) {
+      // Miss Thavel stun — blocked by invincibility
+      if (enemy.active && enemyVariant.name === 'Miss Thavel' && thavelStunCooldown <= 0 && !playerStunned && !invincible) {
         const adx = player.x - enemy.x, ady = player.y - enemy.y;
         if (Math.sqrt(adx * adx + ady * ady) <= THAVEL_STUN_RADIUS) {
           playerStunned = true;
           stunTimer = THAVEL_STUN_DURATION;
           thavelStunCooldown = THAVEL_STUN_COOLDOWN;
         }
+      }
+
+      // If invincible, also clear any existing stun
+      if (invincible && playerStunned) {
+        playerStunned = false;
+        stunTimer = 0;
       }
 
       if (!playerStunned) {
