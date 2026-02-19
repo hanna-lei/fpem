@@ -802,6 +802,7 @@
         if (invincibleTimer <= 0) { invincibleTimer = 0; invincible = false; }
       }
 
+      // Miss Bloomie cycle — speed nerfed to base during invincibility
       if (enemy.active && enemyVariant.name === 'Miss Bloomie') {
         if (bloomieState === 'ready') {
           bloomieState = 'boosted';
@@ -824,9 +825,15 @@
           bloomieCooldown -= dt;
           if (bloomieCooldown <= 0) { bloomieCooldown = 0; bloomieState = 'ready'; }
         }
-        if (bloomieState === 'boosted') currentEnemySpeed = BASE_ENEMY_SPEED + BLOOMIE_BOOST_AMOUNT;
-        else if (bloomieState === 'exhausted') currentEnemySpeed = BASE_ENEMY_SPEED - BLOOMIE_SLOW_AMOUNT;
-        else currentEnemySpeed = BASE_ENEMY_SPEED;
+        if (invincible) {
+          currentEnemySpeed = BASE_ENEMY_SPEED;
+        } else if (bloomieState === 'boosted') {
+          currentEnemySpeed = BASE_ENEMY_SPEED + BLOOMIE_BOOST_AMOUNT;
+        } else if (bloomieState === 'exhausted') {
+          currentEnemySpeed = BASE_ENEMY_SPEED - BLOOMIE_SLOW_AMOUNT;
+        } else {
+          currentEnemySpeed = BASE_ENEMY_SPEED;
+        }
       } else {
         currentEnemySpeed = BASE_ENEMY_SPEED;
       }
@@ -979,7 +986,7 @@
       }
       const flipLeft = (enemyVariant.name === 'Miss Circle') ? (enemy.dir === 0) : (enemy.dir === 2);
       ctx.save();
-      if (enemyVariant.name === 'Miss Bloomie' && bloomieState === 'boosted') {
+      if (enemyVariant.name === 'Miss Bloomie' && bloomieState === 'boosted' && !invincible) {
         ctx.shadowColor = '#4287f5'; ctx.shadowBlur = 20;
       }
       if (flipLeft) {
