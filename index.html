@@ -54,6 +54,8 @@
         }
         lastTime = performance.now();
         pausedAt = 0;
+        // Clear all held keys to prevent stuck movement
+        for (const key in keys) keys[key] = false;
       }
     });
 
