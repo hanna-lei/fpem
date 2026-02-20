@@ -176,6 +176,7 @@
     // ============ INVINCIBILITY ============
     let invincible = false;
     let invincibleTimer = 0;
+    let invincibleStacks = 0;
     const INVINCIBLE_DURATION = 3;
     const OREO_SPEED_BOOST = 5 * T;
 
@@ -606,6 +607,7 @@
       sprinting = false;
       invincible = false;
       invincibleTimer = 0;
+      invincibleStacks = 0;
       gameState = 'playing';
       bgMusic.play();
 
@@ -613,7 +615,7 @@
       inventory[0] = null; inventory[1] = null; inventory[2] = null;
       oreos.length = 0;
 
-      // Place 2 oreos in dead ends (exclude start and exit cells)
+      // Place 2 oreos — prefer dead ends, fall back to random cells
       const startCell = pxToCell(startTX * T, startTY * T);
       const exitCell = pxToCell(exitX, exitY);
       const deadEnds = findDeadEnds().filter(([r, c]) =>
@@ -625,6 +627,27 @@
         [deadEnds[i], deadEnds[j]] = [deadEnds[j], deadEnds[i]];
       }
       const oreoPlacements = deadEnds.slice(0, 2);
+
+      // If not enough dead ends, fill remaining spots with random non-start/exit cells
+      if (oreoPlacements.length < 2) {
+        const usedCells = new Set(oreoPlacements.map(([r, c]) => r + ',' + c));
+        usedCells.add(startCell.r + ',' + startCell.c);
+        usedCells.add(exitCell.r + ',' + exitCell.c);
+        const candidates = [];
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            if (!usedCells.has(r + ',' + c)) candidates.push([r, c]);
+          }
+        }
+        for (let i = candidates.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+        }
+        while (oreoPlacements.length < 2 && candidates.length > 0) {
+          oreoPlacements.push(candidates.pop());
+        }
+      }
+
       for (const [r, c] of oreoPlacements) {
         const center = cellCenterPx(r, c);
         oreos.push({ x: center.x, y: center.y, collected: false });
@@ -739,15 +762,15 @@
           startGame();
         }
       }
-      // Use inventory items
+      // Use inventory items — stacking speed boost
       if ((e.key === 'a' || e.key === 'A') && gameState === 'playing') {
-        if (inventory[0] === 'oreo') { inventory[0] = null; invincible = true; invincibleTimer = INVINCIBLE_DURATION; }
+        if (inventory[0] === 'oreo') { inventory[0] = null; invincible = true; invincibleTimer = INVINCIBLE_DURATION; invincibleStacks++; }
       }
       if ((e.key === 's' || e.key === 'S') && gameState === 'playing') {
-        if (inventory[1] === 'oreo') { inventory[1] = null; invincible = true; invincibleTimer = INVINCIBLE_DURATION; }
+        if (inventory[1] === 'oreo') { inventory[1] = null; invincible = true; invincibleTimer = INVINCIBLE_DURATION; invincibleStacks++; }
       }
       if ((e.key === 'd' || e.key === 'D') && gameState === 'playing') {
-        if (inventory[2] === 'oreo') { inventory[2] = null; invincible = true; invincibleTimer = INVINCIBLE_DURATION; }
+        if (inventory[2] === 'oreo') { inventory[2] = null; invincible = true; invincibleTimer = INVINCIBLE_DURATION; invincibleStacks++; }
       }
     });
     document.addEventListener('keyup', e => { keys[e.key] = false; });
@@ -799,7 +822,7 @@
       }
       if (invincibleTimer > 0) {
         invincibleTimer -= dt;
-        if (invincibleTimer <= 0) { invincibleTimer = 0; invincible = false; }
+        if (invincibleTimer <= 0) { invincibleTimer = 0; invincible = false; invincibleStacks = 0; }
       }
 
       // Miss Bloomie cycle — speed nerfed to base during invincibility
@@ -879,7 +902,7 @@
 
         let currentSpeed = playerSlowed ? PLAYER_SPEED - CIRCLE_SLOW_AMOUNT : PLAYER_SPEED;
         if (sprinting) currentSpeed += SPRINT_BOOST;
-        if (invincible) currentSpeed += OREO_SPEED_BOOST;
+        if (invincible) currentSpeed += OREO_SPEED_BOOST * invincibleStacks;
 
         if (dx > 0) player.dir = 0; else if (dx < 0) player.dir = 2;
         if (dy > 0) player.dir = 1; else if (dy < 0) player.dir = 3;
