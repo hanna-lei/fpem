@@ -177,7 +177,7 @@
 
     // ============ INVINCIBILITY ============
     let invincible = false;
-    let invincibleTimer = 0;
+    const invincibleTimers = [];
     let invincibleStacks = 0;
     const INVINCIBLE_DURATION = 3;
     const OREO_SPEED_BOOST = 5 * T;
@@ -608,7 +608,7 @@
       stamina = MAX_STAMINA;
       sprinting = false;
       invincible = false;
-      invincibleTimer = 0;
+      invincibleTimers.length = 0;
       invincibleStacks = 0;
       gameState = 'playing';
       bgMusic.play();
@@ -764,15 +764,15 @@
           startGame();
         }
       }
-      // Use inventory items — stacking speed boost
+      // Use inventory items — each oreo gets its own independent timer
       if ((e.key === 'a' || e.key === 'A') && gameState === 'playing') {
-        if (inventory[0] === 'oreo') { inventory[0] = null; invincible = true; invincibleTimer = INVINCIBLE_DURATION; invincibleStacks++; }
+        if (inventory[0] === 'oreo') { inventory[0] = null; invincibleTimers.push(INVINCIBLE_DURATION); }
       }
       if ((e.key === 's' || e.key === 'S') && gameState === 'playing') {
-        if (inventory[1] === 'oreo') { inventory[1] = null; invincible = true; invincibleTimer = INVINCIBLE_DURATION; invincibleStacks++; }
+        if (inventory[1] === 'oreo') { inventory[1] = null; invincibleTimers.push(INVINCIBLE_DURATION); }
       }
       if ((e.key === 'd' || e.key === 'D') && gameState === 'playing') {
-        if (inventory[2] === 'oreo') { inventory[2] = null; invincible = true; invincibleTimer = INVINCIBLE_DURATION; invincibleStacks++; }
+        if (inventory[2] === 'oreo') { inventory[2] = null; invincibleTimers.push(INVINCIBLE_DURATION); }
       }
     });
     document.addEventListener('keyup', e => { keys[e.key] = false; });
@@ -822,10 +822,14 @@
         thavelStunCooldown -= dt;
         if (thavelStunCooldown < 0) thavelStunCooldown = 0;
       }
-      if (invincibleTimer > 0) {
-        invincibleTimer -= dt;
-        if (invincibleTimer <= 0) { invincibleTimer = 0; invincible = false; invincibleStacks = 0; }
+
+      // Each oreo timer ticks independently
+      for (let i = invincibleTimers.length - 1; i >= 0; i--) {
+        invincibleTimers[i] -= dt;
+        if (invincibleTimers[i] <= 0) invincibleTimers.splice(i, 1);
       }
+      invincibleStacks = invincibleTimers.length;
+      invincible = invincibleStacks > 0;
 
       // Miss Bloomie cycle — speed nerfed to base during invincibility
       if (enemy.active && enemyVariant.name === 'Miss Bloomie') {
@@ -1114,9 +1118,9 @@
       ctx.strokeStyle = strokeColor; ctx.lineWidth = 1.5; ctx.beginPath();
       ctx.arc(ppx + peox * 0.5, pfaceY + 12 + peoy * 0.5, 4, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke();
 
-      // Invincibility countdown number above head
+      // Invincibility countdown number above head (shows highest remaining timer)
       if (invincible) {
-        const countNum = Math.ceil(invincibleTimer);
+        const countNum = Math.ceil(Math.max(...invincibleTimers));
         ctx.fillStyle = '#ffdd00';
         ctx.font = 'bold 22px Arial';
         ctx.textAlign = 'center';
@@ -1171,7 +1175,7 @@
 
         // Draw item in slot
         if (inventory[i] === 'oreo' && oreoImg.complete && oreoImg.naturalWidth > 0) {
-          const iconW = invRadius * 1.4;
+          const iconW = invRadius * 2.8;
           const iconH = (oreoImg.naturalHeight / oreoImg.naturalWidth) * iconW;
           ctx.drawImage(oreoImg, cx - iconW / 2, cy - iconH / 2, iconW, iconH);
         }
