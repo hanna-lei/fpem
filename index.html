@@ -83,6 +83,7 @@
       hLines.push(p);
       vLines.push(p);
     }
+
     const rows = hLines.length - 1;
     const cols = vLines.length - 1;
 
@@ -181,7 +182,7 @@
     const OREO_TILE_W = 5;
     const oreos = [];
 
-    // ============ KITKAT (NEW) ============
+    // ============ KITKAT ============
     const kitkatImg = new Image();
     kitkatImg.src = 'imgs/kitkats.PNG'; // make sure your file is exactly this name/path
     const KITKAT_TILE_W = 5;
@@ -197,10 +198,10 @@
     const INVINCIBLE_DURATION = 3;
     const OREO_SPEED_BOOST = 5 * T;
 
-    // ============ KITKAT SLOW (NEW) ============
+    // ============ KITKAT SLOW ============
     const KITKAT_SLOW_DURATION = 5;   // seconds
     const KITKAT_SLOW_MULT = 0.5;     // enemy speed * 0.5
-    const kitkatSlowTimers = [];      // supports multiple uses if you collect multiple across rounds
+    const kitkatSlowTimers = [];
     let kitkatSlowActive = false;
 
     // ============ ABILITY CONSTANTS ============
@@ -335,7 +336,6 @@
           if (!visited[nr][nc]) frontier.push({ r, c, nr, nc });
         }
       }
-
       addFrontier(0, 0);
 
       while (frontier.length > 0) {
@@ -359,8 +359,10 @@
       for (let iter = 0; iter < 2000; iter++) {
         const de = findDeadEnds();
         if (de.length <= 3) break;
+
         const cands = de.filter(([r, c]) => !(r === 0 && c === 0) && !(r === rows - 1 && c === cols - 1));
         if (cands.length === 0) break;
+
         const [dr, dc] = cands[rngInt(cands.length)];
         const walls = getClosedWalls(dr, dc);
         if (walls.length > 0) {
@@ -417,6 +419,7 @@
           if (c > 0 && hSegWall[r][c - 1]) hasAdjacentWall = true;
           if (r < rows && vSegWall[r][c]) hasAdjacentWall = true;
           if (r > 0 && vSegWall[r - 1][c]) hasAdjacentWall = true;
+
           if (hasAdjacentWall) {
             for (let dy = 0; dy < WALL_W; dy++) for (let dx = 0; dx < WALL_W; dx++) {
               const yy = hLines[r] + dy, xx = vLines[c] + dx;
@@ -441,6 +444,7 @@
             comp.push([wx, wy]);
             if (wx < minX) minX = wx; if (wx > maxX) maxX = wx;
             if (wy < minY) minY = wy; if (wy > maxY) maxY = wy;
+
             if (wx <= B || wx >= MAP - B - 1 || wy <= B || wy >= MAP - B - 1) touchesBorder = true;
 
             for (const [ddx, ddy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
@@ -480,15 +484,19 @@
 
       if (!bfsReachable(startTX, startTY, exitTX, exitTY, -1, -1)) {
         let cx = startTX, cy = startTY;
+
         while (cx !== exitTX) {
           for (let dy = -Math.floor(CORR_W / 2); dy < Math.ceil(CORR_W / 2); dy++) {
-            const ty = cy + dy; if (ty >= B && ty < MAP - B && cx >= B && cx < MAP - B) map[ty * MAP + cx] = 1;
+            const ty = cy + dy;
+            if (ty >= B && ty < MAP - B && cx >= B && cx < MAP - B) map[ty * MAP + cx] = 1;
           }
           cx += (exitTX > cx) ? 1 : -1;
         }
+
         while (cy !== exitTY) {
           for (let dx = -Math.floor(CORR_W / 2); dx < Math.ceil(CORR_W / 2); dx++) {
-            const tx = cx + dx; if (tx >= B && tx < MAP - B && cy >= B && cy < MAP - B) map[cy * MAP + tx] = 1;
+            const tx = cx + dx;
+            if (tx >= B && tx < MAP - B && cy >= B && cy < MAP - B) map[cy * MAP + tx] = 1;
           }
           cy += (exitTY > cy) ? 1 : -1;
         }
@@ -507,6 +515,7 @@
         for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
           const nx = cx + dx, ny = cy + dy;
           if (nx < 0 || ny < 0 || nx >= MAP || ny >= MAP) continue;
+
           const ni = ny * MAP + nx;
           if (vis[ni] || map[ni] !== 1) continue;
 
@@ -514,6 +523,7 @@
             const adx = nx - avoidX, ady = ny - avoidY;
             if (adx * adx + ady * ady <= exitAvoidR * exitAvoidR) continue;
           }
+
           vis[ni] = 1; q.push(ni);
         }
       }
@@ -549,6 +559,7 @@
         for (let x = 0; x < MAP; x++) {
           if (map[y * MAP + x] === 0) continue;
           const px = x * T, py = y * T;
+
           if (x > 0 && map[y * MAP + (x - 1)] === 0) { mctx.fillStyle = 'rgba(0,0,0,0.12)'; mctx.fillRect(px, py, 2, T); }
           if (x < MAP - 1 && map[y * MAP + (x + 1)] === 0) { mctx.fillStyle = 'rgba(0,0,0,0.06)'; mctx.fillRect(px + T - 2, py, 2, T); }
           if (y > 0 && map[(y - 1) * MAP + x] === 0) { mctx.fillStyle = 'rgba(0,0,0,0.12)'; mctx.fillRect(px, py, T, 2); }
@@ -584,7 +595,6 @@
 
     let enemyWaypoints = [];
     let enemyWpIdx = 0;
-    let lastPlayerCellR = -1, lastPlayerCellC = -1;
     let enemyMoving = false;
 
     let won = false, lost = false, startTime = 0, elapsed = '0.0';
@@ -597,14 +607,17 @@
     const SPRINT_BOOST = 3 * T;
     let sprinting = false;
 
-    // ============ SPAWN HELPERS (NEW) ============
+    // ============ REPATH TIMER (NEW) ============
+    const ENEMY_REPATH_INTERVAL = 0.5; // ~0.5s
+    let enemyRepathTimer = 0;
+
+    // ============ SPAWN HELPERS ============
     function shuffleInPlace(arr) {
       for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [arr[i], arr[j]] = [arr[j], arr[i]];
       }
     }
-
     function cellKey(r, c) { return r + ',' + c; }
 
     function startGame() {
@@ -664,9 +677,9 @@
 
       enemyWaypoints = [];
       enemyWpIdx = 0;
-      lastPlayerCellR = -1;
-      lastPlayerCellC = -1;
       enemyMoving = false;
+
+      enemyRepathTimer = 0; // NEW reset
 
       spriteAnimTimer = 0;
       spriteAnimFrame = 0;
@@ -683,7 +696,6 @@
       invincibleTimers.length = 0;
       invincibleStacks = 0;
 
-      // Reset kitkat slow each round (NEW)
       kitkatSlowTimers.length = 0;
       kitkatSlowActive = false;
 
@@ -707,7 +719,6 @@
       shuffleInPlace(deadEnds);
       const oreoPlacements = deadEnds.slice(0, 2);
 
-      // If not enough dead ends, fill remaining spots with random non-start/exit cells
       if (oreoPlacements.length < 2) {
         const usedCells = new Set(oreoPlacements.map(([r, c]) => cellKey(r, c)));
         usedCells.add(cellKey(startCell.r, startCell.c));
@@ -731,8 +742,7 @@
         oreos.push({ x: center.x, y: center.y, collected: false, r, c });
       }
 
-      // ============ Place 1 KITKAT (NEW) ============
-      // Must be random, NOT a dead end, and NOT overlapping a wall/border/oreo each round.
+      // Place 1 KitKat — random, NOT a dead end, not on start/exit/oreo
       const deadEndSet = new Set(findDeadEnds().map(([r, c]) => cellKey(r, c)));
       const blocked = new Set();
       blocked.add(cellKey(startCell.r, startCell.c));
@@ -753,7 +763,6 @@
       if (kitkatCandidates.length > 0) {
         const [kr, kc] = kitkatCandidates[0];
         const center = cellCenterPx(kr, kc);
-        // center is inside a corridor cell, so it won't overlap a wall/border
         kitkats.push({ x: center.x, y: center.y, collected: false, r: kr, c: kc });
       }
 
@@ -824,16 +833,9 @@
         const isHovered = hovered && hovered.label === r.label;
         const isActive = r.active;
 
-        if (!isActive) {
-          ctx.fillStyle = '#2a2a3e';
-          ctx.strokeStyle = '#444';
-        } else if (isHovered) {
-          ctx.fillStyle = '#5a5a7e';
-          ctx.strokeStyle = '#888';
-        } else {
-          ctx.fillStyle = '#3a3a5e';
-          ctx.strokeStyle = '#666';
-        }
+        if (!isActive) { ctx.fillStyle = '#2a2a3e'; ctx.strokeStyle = '#444'; }
+        else if (isHovered) { ctx.fillStyle = '#5a5a7e'; ctx.strokeStyle = '#888'; }
+        else { ctx.fillStyle = '#3a3a5e'; ctx.strokeStyle = '#666'; }
 
         const br = 10;
         ctx.beginPath();
@@ -873,9 +875,7 @@
 
       if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
-        if (gameState === 'won' || gameState === 'lost' || gameState === 'playing') {
-          startGame();
-        }
+        if (gameState === 'won' || gameState === 'lost' || gameState === 'playing') startGame();
       }
 
       // Use inventory items — each oreo/kitkat gets its own independent timer
@@ -898,6 +898,15 @@
     function recalcEnemyPath() {
       const eCell = pxToCell(enemy.x, enemy.y);
       const pCell = pxToCell(player.x, player.y);
+
+      // If in the same cell, just move directly toward the player's exact position.
+      // (This replaces the removed fallback, but ONLY for same-cell situations.)
+      if (eCell.r === pCell.r && eCell.c === pCell.c) {
+        enemyWaypoints = [{ x: player.x, y: player.y }];
+        enemyWpIdx = 0;
+        return;
+      }
+
       const path = bfsCellPath(eCell.r, eCell.c, pCell.r, pCell.c);
       if (path.length > 0) {
         enemyWaypoints = path;
@@ -950,7 +959,7 @@
       invincibleStacks = invincibleTimers.length;
       invincible = invincibleStacks > 0;
 
-      // Each kitkat slow timer ticks independently (NEW)
+      // Each kitkat slow timer ticks independently
       for (let i = kitkatSlowTimers.length - 1; i >= 0; i--) {
         kitkatSlowTimers[i] -= dt;
         if (kitkatSlowTimers[i] <= 0) kitkatSlowTimers.splice(i, 1);
@@ -981,23 +990,16 @@
           if (bloomieCooldown <= 0) { bloomieCooldown = 0; bloomieState = 'ready'; }
         }
 
-        if (invincible) {
-          currentEnemySpeed = BASE_ENEMY_SPEED;
-        } else if (bloomieState === 'boosted') {
-          currentEnemySpeed = BASE_ENEMY_SPEED + BLOOMIE_BOOST_AMOUNT;
-        } else if (bloomieState === 'exhausted') {
-          currentEnemySpeed = BASE_ENEMY_SPEED - BLOOMIE_SLOW_AMOUNT;
-        } else {
-          currentEnemySpeed = BASE_ENEMY_SPEED;
-        }
+        if (invincible) currentEnemySpeed = BASE_ENEMY_SPEED;
+        else if (bloomieState === 'boosted') currentEnemySpeed = BASE_ENEMY_SPEED + BLOOMIE_BOOST_AMOUNT;
+        else if (bloomieState === 'exhausted') currentEnemySpeed = BASE_ENEMY_SPEED - BLOOMIE_SLOW_AMOUNT;
+        else currentEnemySpeed = BASE_ENEMY_SPEED;
       } else {
         currentEnemySpeed = BASE_ENEMY_SPEED;
       }
 
-      // Apply KITKAT slow AFTER variant logic (NEW)
-      if (kitkatSlowActive) {
-        currentEnemySpeed *= KITKAT_SLOW_MULT; // slows teacher by 50% for 5s
-      }
+      // Apply KITKAT slow AFTER variant logic
+      if (kitkatSlowActive) currentEnemySpeed *= KITKAT_SLOW_MULT;
 
       // Miss Circle aura slow — blocked by invincibility
       playerSlowed = false;
@@ -1022,6 +1024,7 @@
         stunTimer = 0;
       }
 
+      // Player movement
       if (!playerStunned) {
         let dx = 0, dy = 0;
         if (keys['ArrowUp']) dy -= 1;
@@ -1029,7 +1032,6 @@
         if (keys['ArrowLeft']) dx -= 1;
         if (keys['ArrowRight']) dx += 1;
 
-        // Sprint logic
         const isMoving = dx !== 0 || dy !== 0;
         sprinting = (keys['z'] || keys['Z']) && stamina > 0 && isMoving;
 
@@ -1055,7 +1057,7 @@
         sprinting = false;
       }
 
-      // Oreo pickup (5 tiles wide, 4 tiles tall hitbox)
+      // Oreo pickup
       for (const oreo of oreos) {
         if (oreo.collected) continue;
         const odx = Math.abs(player.x - oreo.x);
@@ -1069,7 +1071,7 @@
         }
       }
 
-      // KitKat pickup (NEW) — same pickup mechanic as oreo
+      // KitKat pickup
       for (const kk of kitkats) {
         if (kk.collected) continue;
         const kdx = Math.abs(player.x - kk.x);
@@ -1083,16 +1085,23 @@
         }
       }
 
+      // Win check
       const wx = player.x - exitX, wy = player.y - exitY;
       if (Math.sqrt(wx * wx + wy * wy) < exitR) { won = true; gameState = 'won'; bgMusic.pause(); return; }
 
+      // Enemy logic
       if (elapsedSec >= ENEMY_SPAWN_DELAY) {
-        if (!enemy.active) { enemy.active = true; recalcEnemyPath(); }
+        if (!enemy.active) {
+          enemy.active = true;
+          recalcEnemyPath();              // initial path
+          enemyRepathTimer = ENEMY_REPATH_INTERVAL; // NEW: start repath cooldown
+        }
 
-        const pCell = pxToCell(player.x, player.y);
-        if (pCell.r !== lastPlayerCellR || pCell.c !== lastPlayerCellC || enemyWpIdx >= enemyWaypoints.length) {
-          lastPlayerCellR = pCell.r; lastPlayerCellC = pCell.c;
+        // NEW: repath only every ~0.5s
+        enemyRepathTimer -= dt;
+        if (enemyRepathTimer <= 0) {
           recalcEnemyPath();
+          enemyRepathTimer = ENEMY_REPATH_INTERVAL;
         }
 
         const prevEX = enemy.x, prevEY = enemy.y;
@@ -1122,19 +1131,7 @@
           }
         }
 
-        const eCell = pxToCell(enemy.x, enemy.y);
-        const pCell2 = pxToCell(player.x, player.y);
-
-        if (eCell.r === pCell2.r && eCell.c === pCell2.c && enemyWpIdx >= enemyWaypoints.length) {
-          const tdx = player.x - enemy.x, tdy = player.y - enemy.y;
-          const dist = Math.sqrt(tdx * tdx + tdy * tdy);
-          if (dist > 1) {
-            const move = Math.min(currentEnemySpeed * dt, dist);
-            enemy.x += (tdx / dist) * move; enemy.y += (tdy / dist) * move;
-            if (Math.abs(tdx) > Math.abs(tdy)) enemy.dir = tdx > 0 ? 0 : 2;
-            else enemy.dir = tdy > 0 ? 1 : 3;
-          }
-        }
+        // REMOVED: same-cell direct chase fallback block (this is what made juking impossible)
 
         const movedDist = Math.sqrt((enemy.x - prevEX) ** 2 + (enemy.y - prevEY) ** 2);
         enemyMoving = movedDist > 0.5;
@@ -1147,8 +1144,10 @@
           }
         }
 
+        // Collision (AABB)
         const pLeft = player.x - PW / 2, pRight = player.x + PW / 2;
         const pTop = player.y - PH / 2, pBottom = player.y + PH / 2;
+
         const eLeft = enemy.x - EW / 2, eRight = enemy.x + EW / 2;
         const eTop = enemy.y - EH / 2, eBottom = enemy.y + EH / 2;
 
@@ -1187,7 +1186,6 @@
         ctx.shadowColor = '#4287f5'; ctx.shadowBlur = 20;
       }
 
-      // Optional: subtle slow glow if kitkat is active (NEW)
       if (kitkatSlowActive) {
         ctx.shadowColor = '#d94b4b';
         ctx.shadowBlur = 12;
@@ -1249,11 +1247,10 @@
 
       if (enemy.active) drawEnemy(enemy.x - camX, enemy.y - camY);
 
-      // Draw oreos on map
+      // Oreos on map
       if (oreoImg.complete && oreoImg.naturalWidth > 0) {
         const oreoDrawW = OREO_TILE_W * T;
         const oreoDrawH = (oreoImg.naturalHeight / oreoImg.naturalWidth) * oreoDrawW;
-
         for (const oreo of oreos) {
           if (oreo.collected) continue;
           const ox = oreo.x - camX - oreoDrawW / 2;
@@ -1262,11 +1259,10 @@
         }
       }
 
-      // Draw kitkat on map (NEW)
+      // KitKat on map
       if (kitkatImg.complete && kitkatImg.naturalWidth > 0) {
         const kkDrawW = KITKAT_TILE_W * T;
         const kkDrawH = (kitkatImg.naturalHeight / kitkatImg.naturalWidth) * kkDrawW;
-
         for (const kk of kitkats) {
           if (kk.collected) continue;
           const kx = kk.x - camX - kkDrawW / 2;
@@ -1281,7 +1277,6 @@
       ctx.fillStyle = 'rgba(0,0,0,0.15)';
       ctx.beginPath(); ctx.ellipse(ppx + 1, ppy + phh + 3, phw * 0.8, 4, 0, 0, Math.PI * 2); ctx.fill();
 
-      // Invincibility glow
       if (invincible) { ctx.save(); ctx.shadowColor = '#ffdd00'; ctx.shadowBlur = 20; }
 
       const br = 4;
@@ -1315,7 +1310,7 @@
       ctx.strokeStyle = strokeColor; ctx.lineWidth = 1.5; ctx.beginPath();
       ctx.arc(ppx + peox * 0.5, pfaceY + 12 + peoy * 0.5, 4, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke();
 
-      // Invincibility countdown number above head (shows highest remaining timer)
+      // Invincibility countdown number above head
       if (invincible) {
         const countNum = Math.ceil(Math.max(...invincibleTimers));
         ctx.fillStyle = '#ffdd00';
@@ -1374,18 +1369,18 @@
 
         // Draw item in slot
         if (inventory[i] === 'oreo' && oreoImg.complete && oreoImg.naturalWidth > 0) {
-          const iconW = invRadius * 2.24; // 20% smaller than 2.8
+          const iconW = invRadius * 2.24; // (your 20% smaller value)
           const iconH = (oreoImg.naturalHeight / oreoImg.naturalWidth) * iconW;
           ctx.drawImage(oreoImg, cx - iconW / 2, cy - iconH / 2, iconW, iconH);
         }
-
         if (inventory[i] === 'kitkat' && kitkatImg.complete && kitkatImg.naturalWidth > 0) {
-          const iconW = invRadius * 2.24; // 20% smaller than 2.8
+          const iconW = invRadius * 2.24; // (your 20% smaller value)
           const iconH = (kitkatImg.naturalHeight / kitkatImg.naturalWidth) * iconW;
           ctx.drawImage(kitkatImg, cx - iconW / 2, cy - iconH / 2, iconW, iconH);
         }
       }
 
+      // Enemy warning
       const elapsedSec = (Date.now() - startTime) / 1000;
       if (!enemy.active && gameState === 'playing') {
         const secsLeft = Math.max(0, Math.ceil(ENEMY_SPAWN_DELAY - elapsedSec));
