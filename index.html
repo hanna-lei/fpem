@@ -1328,6 +1328,22 @@
         ctx.fillText(countNum, ppx, ppy - phh - 8);
       }
 
+      // STUN HALO
+      if (playerStunned) {
+        const haloY = ppy - phh - 10;
+        const spinSpeed = Date.now() / 300;
+        const starCount = 5;
+        const haloRadius = 20;
+        ctx.font = '14px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        for (let i = 0; i < starCount; i++) {
+          const angle = spinSpeed + (i * Math.PI * 2 / starCount);
+          const ssx = ppx + Math.cos(angle) * haloRadius;
+          const ssy = haloY + Math.sin(angle) * (haloRadius * 0.4);
+          ctx.fillStyle = '#ffdd00';
+          ctx.fillText('⭐', ssx, ssy);
+        }
+      }
+
       // HUD
       ctx.fillStyle = '#fff';
       ctx.font = '16px Arial';
