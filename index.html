@@ -749,6 +749,17 @@
         const k = cellKey(r, c);
         if (blocked.has(k)) continue;
         if (deadEndSet.has(k)) continue;
+
+        // Prevent spawning in a 3x3 cell area around start and exit
+        if (Math.abs(r - startCell.r) <= 1 && Math.abs(c - startCell.c) <= 1) continue;
+        if (Math.abs(r - exitCell.r) <= 1 && Math.abs(c - exitCell.c) <= 1) continue;
+
+        // Also prevent spawning in any of the 4 corner cells (potential start/exit zones)
+        if ((r === 0 && c === 0) || (r === 0 && c === cols - 1) ||
+          (r === rows - 1 && c === 0) || (r === rows - 1 && c === cols - 1)) {
+          continue;
+        }
+
         kitkatCandidates.push([r, c]);
       }
       shuffleInPlace(kitkatCandidates);
@@ -1057,7 +1068,7 @@
         if (oreo.collected) continue;
         const odx = Math.abs(player.x - oreo.x);
         const ody = Math.abs(player.y - oreo.y);
-        if (odx < 2.5 * T && ody < 2 * T) {
+        if (odx < 4 * T && ody < 4 * T) {
           const slot = inventory.indexOf(null);
           if (slot !== -1) {
             inventory[slot] = 'oreo';
@@ -1071,7 +1082,7 @@
         if (kk.collected) continue;
         const kdx = Math.abs(player.x - kk.x);
         const kdy = Math.abs(player.y - kk.y);
-        if (kdx < 2.5 * T && kdy < 2 * T) {
+        if (kdx < 4 * T && kdy < 4 * T) {
           const slot = inventory.indexOf(null);
           if (slot !== -1) {
             inventory[slot] = 'kitkat';
