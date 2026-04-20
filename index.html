@@ -921,17 +921,17 @@
       if ((e.key === 'a' || e.key === 'A') && gameState === 'playing') {
         if (inventory[0] === 'oreo') { inventory[0] = null; invincibleTimers.push(INVINCIBLE_DURATION); }
         else if (inventory[0] === 'kitkat') { inventory[0] = null; kitkatSlowTimers.push(KITKAT_SLOW_DURATION); }
-        else if (inventory[0] === 'apple') { inventory[0] = null; stamina = MAX_STAMINA; sprintExhausted = false; }
+        else if (inventory[0] === 'apple') { inventory[0] = null; stamina = Math.min(MAX_STAMINA, stamina + MAX_STAMINA / 2); sprintExhausted = false; }
       }
       if ((e.key === 's' || e.key === 'S') && gameState === 'playing') {
         if (inventory[1] === 'oreo') { inventory[1] = null; invincibleTimers.push(INVINCIBLE_DURATION); }
         else if (inventory[1] === 'kitkat') { inventory[1] = null; kitkatSlowTimers.push(KITKAT_SLOW_DURATION); }
-        else if (inventory[1] === 'apple') { inventory[1] = null; stamina = MAX_STAMINA; sprintExhausted = false; }
+        else if (inventory[1] === 'apple') { inventory[1] = null; stamina = Math.min(MAX_STAMINA, stamina + MAX_STAMINA / 2); sprintExhausted = false; }
       }
       if ((e.key === 'd' || e.key === 'D') && gameState === 'playing') {
         if (inventory[2] === 'oreo') { inventory[2] = null; invincibleTimers.push(INVINCIBLE_DURATION); }
         else if (inventory[2] === 'kitkat') { inventory[2] = null; kitkatSlowTimers.push(KITKAT_SLOW_DURATION); }
-        else if (inventory[2] === 'apple') { inventory[2] = null; stamina = MAX_STAMINA; sprintExhausted = false; }
+        else if (inventory[2] === 'apple') { inventory[2] = null; stamina = Math.min(MAX_STAMINA, stamina + MAX_STAMINA / 2); sprintExhausted = false; }
       }
     });
     document.addEventListener('keyup', e => { keys[e.key] = false; });
