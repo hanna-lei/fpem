@@ -1314,8 +1314,6 @@
       ctx.font = '13px Arial';
       ctx.fillText('START', stSX, stSY);
 
-      if (enemy.active) drawEnemy(enemy.x - camX, enemy.y - camY);
-
       // Oreos on map
       if (oreoImg.complete && oreoImg.naturalWidth > 0) {
         const oreoDrawW = OREO_TILE_W * T;
@@ -1351,6 +1349,8 @@
           ctx.drawImage(kitkatImg, kx, ky, kkDrawW, kkDrawH);
         }
       }
+
+      if (enemy.active) drawEnemy(enemy.x - camX, enemy.y - camY);
 
       // Player
       const ppx = W / 2, ppy = H / 2, phw = PW / 2, phh = PH / 2;
