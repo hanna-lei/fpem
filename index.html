@@ -222,7 +222,7 @@
         name: 'Miss Circle',
         body: '#cc2222', stroke: '#991111', eye: '#ff0',
         minimap: '#cc2222', weight: 1 / 3,
-        speed: 17 * T, w: 9 * T, h: 10 * T,
+        speed: 17 * T, w: 7 * T, h: 9 * T,
         drawW: 13 * T, drawH: 14 * T,
         sprite: circleSprite
       },
@@ -903,9 +903,20 @@
       const eCell = pxToCell(enemy.x, enemy.y);
       const pCell = pxToCell(player.x, player.y);
       const path = bfsCellPath(eCell.r, eCell.c, pCell.r, pCell.c);
+
       if (path.length > 0) {
+        let startIdx = 0;
+        if (path.length > 1) {
+          const c0 = path[0], c1 = path[1];
+          const dot = (enemy.x - c0.x) * (c1.x - c0.x) + (enemy.y - c0.y) * (c1.y - c0.y);
+          if (dot > 0) startIdx = 1;
+        }
+        path.push({ x: player.x, y: player.y });
         enemyWaypoints = path;
-        enemyWpIdx = 1;
+        enemyWpIdx = startIdx;
+      } else {
+        enemyWaypoints = [{ x: player.x, y: player.y }];
+        enemyWpIdx = 0;
       }
     }
 
@@ -1107,7 +1118,7 @@
         }
 
         enemyRepathTimer -= dt;
-        if (enemyRepathTimer <= 0) {
+        if (enemyRepathTimer <= 0 || (enemyWaypoints.length > 0 && enemyWpIdx >= enemyWaypoints.length)) {
           recalcEnemyPath();
           enemyRepathTimer = ENEMY_REPATH_INTERVAL;
         }
@@ -1134,22 +1145,6 @@
               enemy.x += (tdx / dist) * remaining;
               enemy.y += (tdy / dist) * remaining;
               remaining = 0;
-            }
-          }
-        } else {
-          // Same-cell direct chase fallback to prevent awkward stopping when waypoints are exhausted
-          const eCell = pxToCell(enemy.x, enemy.y);
-          const pCell = pxToCell(player.x, player.y);
-          if (eCell.r === pCell.r && eCell.c === pCell.c) {
-            let tdx = player.x - enemy.x;
-            let tdy = player.y - enemy.y;
-            const dist = Math.sqrt(tdx * tdx + tdy * tdy);
-            if (dist > 0) {
-              if (Math.abs(tdx) > Math.abs(tdy)) enemy.dir = tdx > 0 ? 0 : 2;
-              else enemy.dir = tdy > 0 ? 1 : 3;
-              let moveDist = Math.min(currentEnemySpeed * dt, dist);
-              enemy.x += (tdx / dist) * moveDist;
-              enemy.y += (tdy / dist) * moveDist;
             }
           }
         }
