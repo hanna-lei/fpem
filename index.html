@@ -187,7 +187,13 @@
     const KITKAT_TILE_W = 5;
     const kitkats = [];
 
-    // Inventory: can hold 'oreo' or 'kitkat'
+    // ============ APPLE ============
+    const appleImg = new Image();
+    appleImg.src = 'imgs/apple.PNG';
+    const APPLE_TILE_H = 4;
+    const apples = [];
+
+    // Inventory: can hold 'oreo', 'kitkat', or 'apple'
     const inventory = [null, null, null];
 
     // ============ INVINCIBILITY ============
@@ -706,6 +712,7 @@
       inventory[0] = null; inventory[1] = null; inventory[2] = null;
       oreos.length = 0;
       kitkats.length = 0;
+      apples.length = 0;
 
       // Place 2 oreos — prefer dead ends, fall back to random cells
       const startCell = pxToCell(startTX * T, startTY * T);
@@ -768,6 +775,34 @@
         const [kr, kc] = kitkatCandidates[0];
         const center = cellCenterPx(kr, kc);
         kitkats.push({ x: center.x, y: center.y, collected: false, r: kr, c: kc });
+        blocked.add(cellKey(kr, kc));
+      }
+
+      // Place 1 Apple — random, NOT a dead end, not on start/exit/oreo/kitkat/corners
+      const appleCandidates = [];
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        const k = cellKey(r, c);
+        if (blocked.has(k)) continue;
+        if (deadEndSet.has(k)) continue;
+
+        // Prevent spawning in a 3x3 cell area around start and exit
+        if (Math.abs(r - startCell.r) <= 1 && Math.abs(c - startCell.c) <= 1) continue;
+        if (Math.abs(r - exitCell.r) <= 1 && Math.abs(c - exitCell.c) <= 1) continue;
+
+        // Also prevent spawning in any of the 4 corner cells
+        if ((r === 0 && c === 0) || (r === 0 && c === cols - 1) ||
+          (r === rows - 1 && c === 0) || (r === rows - 1 && c === cols - 1)) {
+          continue;
+        }
+
+        appleCandidates.push([r, c]);
+      }
+      shuffleInPlace(appleCandidates);
+
+      if (appleCandidates.length > 0) {
+        const [ar, ac] = appleCandidates[0];
+        const center = cellCenterPx(ar, ac);
+        apples.push({ x: center.x, y: center.y, collected: false, r: ar, c: ac });
       }
 
       console.log(`Seed: ${chosenSeed}, Exit: ${exitCorner}, Enemy: ${enemyVariant.name}`);
@@ -886,14 +921,17 @@
       if ((e.key === 'a' || e.key === 'A') && gameState === 'playing') {
         if (inventory[0] === 'oreo') { inventory[0] = null; invincibleTimers.push(INVINCIBLE_DURATION); }
         else if (inventory[0] === 'kitkat') { inventory[0] = null; kitkatSlowTimers.push(KITKAT_SLOW_DURATION); }
+        else if (inventory[0] === 'apple') { inventory[0] = null; stamina = MAX_STAMINA; sprintExhausted = false; }
       }
       if ((e.key === 's' || e.key === 'S') && gameState === 'playing') {
         if (inventory[1] === 'oreo') { inventory[1] = null; invincibleTimers.push(INVINCIBLE_DURATION); }
         else if (inventory[1] === 'kitkat') { inventory[1] = null; kitkatSlowTimers.push(KITKAT_SLOW_DURATION); }
+        else if (inventory[1] === 'apple') { inventory[1] = null; stamina = MAX_STAMINA; sprintExhausted = false; }
       }
       if ((e.key === 'd' || e.key === 'D') && gameState === 'playing') {
         if (inventory[2] === 'oreo') { inventory[2] = null; invincibleTimers.push(INVINCIBLE_DURATION); }
         else if (inventory[2] === 'kitkat') { inventory[2] = null; kitkatSlowTimers.push(KITKAT_SLOW_DURATION); }
+        else if (inventory[2] === 'apple') { inventory[2] = null; stamina = MAX_STAMINA; sprintExhausted = false; }
       }
     });
     document.addEventListener('keyup', e => { keys[e.key] = false; });
@@ -1091,6 +1129,20 @@
         }
       }
 
+      // Pickup apple
+      for (const apple of apples) {
+        if (apple.collected) continue;
+        const adx = Math.abs(player.x - apple.x);
+        const ady = Math.abs(player.y - apple.y);
+        if (adx < 4 * T && ady < 4 * T) {
+          const slot = inventory.indexOf(null);
+          if (slot !== -1) {
+            inventory[slot] = 'apple';
+            apple.collected = true;
+          }
+        }
+      }
+
       // Pickup kitkat
       for (const kk of kitkats) {
         if (kk.collected) continue;
@@ -1276,6 +1328,18 @@
         }
       }
 
+      // Apple on map
+      if (appleImg.complete && appleImg.naturalWidth > 0) {
+        const appleDrawH = APPLE_TILE_H * T;
+        const appleDrawW = (appleImg.naturalWidth / appleImg.naturalHeight) * appleDrawH;
+        for (const apple of apples) {
+          if (apple.collected) continue;
+          const ax = apple.x - camX - appleDrawW / 2;
+          const ay = apple.y - camY - appleDrawH / 2;
+          ctx.drawImage(appleImg, ax, ay, appleDrawW, appleDrawH);
+        }
+      }
+
       // KitKat on map
       if (kitkatImg.complete && kitkatImg.naturalWidth > 0) {
         const kkDrawW = KITKAT_TILE_W * T;
@@ -1403,6 +1467,11 @@
           const iconW = invRadius * 2.24;
           const iconH = (kitkatImg.naturalHeight / kitkatImg.naturalWidth) * iconW;
           ctx.drawImage(kitkatImg, cx - iconW / 2, cy - iconH / 2, iconW, iconH);
+        }
+        if (inventory[i] === 'apple' && appleImg.complete && appleImg.naturalWidth > 0) {
+          const iconH = invRadius * 1.8;
+          const iconW = (appleImg.naturalWidth / appleImg.naturalHeight) * iconH;
+          ctx.drawImage(appleImg, cx - iconW / 2, cy - iconH / 2, iconW, iconH);
         }
       }
 
