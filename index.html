@@ -943,15 +943,20 @@
       const path = bfsCellPath(eCell.r, eCell.c, pCell.r, pCell.c);
 
       if (path.length > 0) {
-        let startIdx = 0;
-        if (path.length > 1) {
-          const c0 = path[0], c1 = path[1];
-          const dot = (enemy.x - c0.x) * (c1.x - c0.x) + (enemy.y - c0.y) * (c1.y - c0.y);
-          if (dot > 0) startIdx = 1;
-        }
         path.push({ x: player.x, y: player.y });
+
+        let targetIdx = 0;
+        const hw = enemyVariant.w / 2, hh = enemyVariant.h / 2;
+
+        for (let i = path.length - 1; i >= 0; i--) {
+          if (hasLineOfSight(enemy.x, enemy.y, path[i].x, path[i].y, hw, hh)) {
+            targetIdx = i;
+            break;
+          }
+        }
+
         enemyWaypoints = path;
-        enemyWpIdx = startIdx;
+        enemyWpIdx = targetIdx;
       } else {
         enemyWaypoints = [{ x: player.x, y: player.y }];
         enemyWpIdx = 0;
@@ -969,6 +974,20 @@
         isFloor(px - hw, py + hh) && isFloor(px + hw, py + hh) &&
         isFloor(px, py - hh) && isFloor(px, py + hh) &&
         isFloor(px - hw, py) && isFloor(px + hw, py);
+    }
+
+    function hasLineOfSight(x1, y1, x2, y2, hw, hh) {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist === 0) return true;
+      const steps = Math.ceil(dist / (T / 2)); // Check every half tile
+      for (let i = 1; i <= steps; i++) {
+        const px = x1 + (dx / steps) * i;
+        const py = y1 + (dy / steps) * i;
+        if (!canMove(px, py, hw, hh)) return false;
+      }
+      return true;
     }
 
     // ============ UPDATE ============
