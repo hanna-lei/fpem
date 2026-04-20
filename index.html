@@ -778,7 +778,7 @@
       { label: 'Tutorial', active: false },
       { label: 'Play', active: false },
       { label: 'Randomize', active: true },
-      { label: 'Enemies', active: false }
+      { label: 'Info', active: false }
     ];
 
     let mouseX = 0, mouseY = 0;
@@ -1025,7 +1025,10 @@
         const wantSprint = (keys['z'] || keys['Z']) && isMoving;
 
         // If you're exhausted, you can't START sprinting again until stamina is back to >= minimum
-        if (sprintExhausted && stamina >= SPRINT_MIN_STAMINA) sprintExhausted = false;
+        // AND you must release the sprint key first (sprint lockout).
+        if (sprintExhausted && stamina >= SPRINT_MIN_STAMINA && !(keys['z'] || keys['Z'])) {
+          sprintExhausted = false;
+        }
 
         // Start requires >= min AND not exhausted
         const canStartSprint = !sprintExhausted && stamina >= SPRINT_MIN_STAMINA;
@@ -1133,9 +1136,23 @@
               remaining = 0;
             }
           }
+        } else {
+          // Same-cell direct chase fallback to prevent awkward stopping when waypoints are exhausted
+          const eCell = pxToCell(enemy.x, enemy.y);
+          const pCell = pxToCell(player.x, player.y);
+          if (eCell.r === pCell.r && eCell.c === pCell.c) {
+            let tdx = player.x - enemy.x;
+            let tdy = player.y - enemy.y;
+            const dist = Math.sqrt(tdx * tdx + tdy * tdy);
+            if (dist > 0) {
+              if (Math.abs(tdx) > Math.abs(tdy)) enemy.dir = tdx > 0 ? 0 : 2;
+              else enemy.dir = tdy > 0 ? 1 : 3;
+              let moveDist = Math.min(currentEnemySpeed * dt, dist);
+              enemy.x += (tdx / dist) * moveDist;
+              enemy.y += (tdy / dist) * moveDist;
+            }
+          }
         }
-
-        // NOTE: same-cell direct chase fallback is removed (juking)
 
         const movedDist = Math.sqrt((enemy.x - prevEX) ** 2 + (enemy.y - prevEY) ** 2);
         enemyMoving = movedDist > 0.5;
