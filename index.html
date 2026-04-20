@@ -367,7 +367,7 @@
       for (let iter = 0; iter < 2000; iter++) {
         const de = findDeadEnds();
         if (de.length <= 3) break;
-        const cands = de.filter(([r, c]) => !(r === 0 && c === 0) && !(r === rows - 1 && c === cols - 1));
+        const cands = de.filter(([r, c]) => !(r === 0 && c === 0));
         if (cands.length === 0) break;
         const [dr, dc] = cands[rngInt(cands.length)];
         const walls = getClosedWalls(dr, dc);
@@ -825,7 +825,7 @@
         const finalSpots = validSpots.filter(spot => {
           const tx = spot.x / T + (spot.w / T) / 2;
           const ty = spot.y / T + (spot.h / T) / 2;
-          return Math.abs(tx - startTX) > 12.5 || Math.abs(ty - startTY) > 12.5;
+          return !(tx < MAP / 2 && ty < MAP / 2);
         });
 
         if (finalSpots.length > 0) return finalSpots[rngInt(finalSpots.length)];
@@ -1173,13 +1173,6 @@
         // Decision
         sprinting = wantSprint && (sprinting ? canContinueSprint : canStartSprint);
 
-        // Drain / regen
-        if (sprinting) stamina = Math.max(0, stamina - STAMINA_DRAIN * dt);
-        else stamina = Math.min(MAX_STAMINA, stamina + STAMINA_REGEN * dt);
-
-        // If you STOP sprinting while below min, you're exhausted
-        if (!sprinting && stamina < SPRINT_MIN_STAMINA) sprintExhausted = true;
-
         let currentSpeed = playerSlowed ? PLAYER_SPEED - CIRCLE_SLOW_AMOUNT : PLAYER_SPEED;
         if (sprinting) currentSpeed += SPRINT_BOOST;
         if (invincible) currentSpeed += OREO_SPEED_BOOST * invincibleStacks;
@@ -1192,8 +1185,18 @@
         const moveX = dx * currentSpeed * dt, moveY = dy * currentSpeed * dt;
         const hw = PW / 2 - 1, hh = PH / 2 - 1;
 
-        if (canMove(player.x + moveX, player.y, hw, hh)) player.x += moveX;
-        if (canMove(player.x, player.y + moveY, hw, hh)) player.y += moveY;
+        let actuallyMoved = false;
+        if (moveX !== 0 && canMove(player.x + moveX, player.y, hw, hh)) { player.x += moveX; actuallyMoved = true; }
+        if (moveY !== 0 && canMove(player.x, player.y + moveY, hw, hh)) { player.y += moveY; actuallyMoved = true; }
+
+        if (sprinting && !actuallyMoved) sprinting = false;
+
+        // Drain / regen
+        if (sprinting) stamina = Math.max(0, stamina - STAMINA_DRAIN * dt);
+        else stamina = Math.min(MAX_STAMINA, stamina + STAMINA_REGEN * dt);
+
+        // If you STOP sprinting while below min, you're exhausted
+        if (!sprinting && stamina < SPRINT_MIN_STAMINA) sprintExhausted = true;
       } else {
         stamina = Math.min(MAX_STAMINA, stamina + STAMINA_REGEN * dt);
         sprinting = false;
