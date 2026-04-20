@@ -193,6 +193,11 @@
     const APPLE_TILE_H = 4;
     const apples = [];
 
+    // ============ LOCKERS ============
+    const lockers = [];
+    let playerInLocker = false;
+    let lockerTimer = 0;
+
     // Inventory: can hold 'oreo', 'kitkat', or 'apple'
     const inventory = [null, null, null];
 
@@ -713,6 +718,9 @@
       oreos.length = 0;
       kitkats.length = 0;
       apples.length = 0;
+      lockers.length = 0;
+      playerInLocker = false;
+      lockerTimer = 0;
 
       // Place 2 oreos — prefer dead ends, fall back to random cells
       const startCell = pxToCell(startTX * T, startTY * T);
@@ -804,6 +812,38 @@
         const center = cellCenterPx(ar, ac);
         apples.push({ x: center.x, y: center.y, collected: false, r: ar, c: ac });
       }
+
+      // Place 1 Locker in a dead end (preferring one without oreos)
+      function spawnLockerInDeadEnd(de) {
+        const r = de[0], c = de[1];
+        const validSpots = [];
+        if (r > 0 && hSegWall[r][c] === 1) validSpots.push({ x: (vLines[c] + 4) * T, y: hLines[r] * T, w: 5 * T, h: 3 * T, used: false });
+        if (r < rows - 1 && hSegWall[r+1][c] === 1) validSpots.push({ x: (vLines[c] + 4) * T, y: hLines[r+1] * T, w: 5 * T, h: 3 * T, used: false });
+        if (c > 0 && vSegWall[r][c] === 1) validSpots.push({ x: vLines[c] * T, y: (hLines[r] + 4) * T, w: 3 * T, h: 5 * T, used: false });
+        if (c < cols - 1 && vSegWall[r][c+1] === 1) validSpots.push({ x: vLines[c+1] * T, y: (hLines[r] + 4) * T, w: 3 * T, h: 5 * T, used: false });
+        
+        const finalSpots = validSpots.filter(spot => {
+          const tx = spot.x / T + (spot.w / T) / 2;
+          const ty = spot.y / T + (spot.h / T) / 2;
+          return Math.abs(tx - startTX) > 12.5 || Math.abs(ty - startTY) > 12.5;
+        });
+
+        if (finalSpots.length > 0) return finalSpots[rngInt(finalSpots.length)];
+        return null;
+      }
+
+      let lockerSpot = null;
+      for (let i = 2; i < deadEnds.length; i++) {
+        lockerSpot = spawnLockerInDeadEnd(deadEnds[i]);
+        if (lockerSpot) break;
+      }
+      if (!lockerSpot) {
+        for (let i = 0; i < Math.min(2, deadEnds.length); i++) {
+          lockerSpot = spawnLockerInDeadEnd(deadEnds[i]);
+          if (lockerSpot) break;
+        }
+      }
+      if (lockerSpot) lockers.push(lockerSpot);
 
       console.log(`Seed: ${chosenSeed}, Exit: ${exitCorner}, Enemy: ${enemyVariant.name}`);
     }
@@ -939,11 +979,16 @@
     // ============ PATHFINDING ============
     function recalcEnemyPath() {
       const eCell = pxToCell(enemy.x, enemy.y);
-      const pCell = pxToCell(player.x, player.y);
+      let targetX = player.x, targetY = player.y;
+      if (playerInLocker) {
+        targetX = startTX * T;
+        targetY = startTY * T;
+      }
+      const pCell = pxToCell(targetX, targetY);
       const path = bfsCellPath(eCell.r, eCell.c, pCell.r, pCell.c);
 
       if (path.length > 0) {
-        path.push({ x: player.x, y: player.y });
+        path.push({ x: targetX, y: targetY });
 
         let targetIdx = 0;
         const hw = enemyVariant.w / 2, hh = enemyVariant.h / 2;
@@ -958,7 +1003,7 @@
         enemyWaypoints = path;
         enemyWpIdx = targetIdx;
       } else {
-        enemyWaypoints = [{ x: player.x, y: player.y }];
+        enemyWaypoints = [{ x: targetX, y: targetY }];
         enemyWpIdx = 0;
       }
     }
@@ -1064,13 +1109,13 @@
 
       // Circle aura slow (blocked by invincible)
       playerSlowed = false;
-      if (enemy.active && enemyVariant.name === 'Miss Circle' && !invincible) {
+      if (enemy.active && enemyVariant.name === 'Miss Circle' && !invincible && !playerInLocker) {
         const adx = player.x - enemy.x, ady = player.y - enemy.y;
         if (Math.sqrt(adx * adx + ady * ady) <= CIRCLE_AURA_RADIUS) playerSlowed = true;
       }
 
       // Thavel stun (blocked by invincible)
-      if (enemy.active && enemyVariant.name === 'Miss Thavel' && thavelStunCooldown <= 0 && !playerStunned && !invincible) {
+      if (enemy.active && enemyVariant.name === 'Miss Thavel' && thavelStunCooldown <= 0 && !playerStunned && !invincible && !playerInLocker) {
         const adx = player.x - enemy.x, ady = player.y - enemy.y;
         if (Math.sqrt(adx * adx + ady * ady) <= THAVEL_STUN_RADIUS) {
           playerStunned = true;
@@ -1081,8 +1126,29 @@
 
       if (invincible && playerStunned) { playerStunned = false; stunTimer = 0; }
 
+      if (playerInLocker) {
+        lockerTimer -= dt;
+        if (lockerTimer <= 0) {
+          playerInLocker = false;
+          lockerTimer = 0;
+          recalcEnemyPath();
+        }
+      } else {
+        for (const locker of lockers) {
+          if (locker.used) continue;
+          if (player.x + PW/2 > locker.x - T && player.x - PW/2 < locker.x + locker.w + T &&
+              player.y + PH/2 > locker.y - T && player.y - PH/2 < locker.y + locker.h + T) {
+            playerInLocker = true;
+            lockerTimer = 5;
+            locker.used = true;
+            recalcEnemyPath();
+            break;
+          }
+        }
+      }
+
       // Player movement
-      if (!playerStunned) {
+      if (!playerStunned && !playerInLocker) {
         let dx = 0, dy = 0;
         if (keys['ArrowUp']) dy -= 1;
         if (keys['ArrowDown']) dy += 1;
@@ -1371,8 +1437,23 @@
 
       if (enemy.active) drawEnemy(enemy.x - camX, enemy.y - camY);
 
+      // Lockers
+      for (const locker of lockers) {
+        if (!locker.used) {
+          ctx.fillStyle = '#87CEEB';
+          ctx.fillRect(locker.x - camX, locker.y - camY, locker.w, locker.h);
+        } else if (playerInLocker) {
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 20px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(Math.ceil(lockerTimer), locker.x + locker.w / 2 - camX, locker.y - camY - 5);
+        }
+      }
+
       // Player
-      const ppx = W / 2, ppy = H / 2, phw = PW / 2, phh = PH / 2;
+      if (!playerInLocker) {
+        const ppx = W / 2, ppy = H / 2, phw = PW / 2, phh = PH / 2;
 
       ctx.fillStyle = 'rgba(0,0,0,0.15)';
       ctx.beginPath();
@@ -1437,6 +1518,7 @@
           ctx.fillStyle = '#ffdd00';
           ctx.fillText('⭐', ssx, ssy);
         }
+      }
       }
 
       // HUD
