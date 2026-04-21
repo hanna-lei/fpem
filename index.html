@@ -814,33 +814,75 @@
       }
 
       // Place 1 Locker in a dead end (preferring one without oreos)
-      function spawnLockerInDeadEnd(de) {
-        const r = de[0], c = de[1];
+      function getLockerSpotsForCell(r, c) {
         const validSpots = [];
-        if (r > 0 && hSegWall[r][c] === 1) validSpots.push({ x: (vLines[c] + 4) * T, y: hLines[r] * T, w: 5 * T, h: 3 * T, used: false });
-        if (r < rows - 1 && hSegWall[r+1][c] === 1) validSpots.push({ x: (vLines[c] + 4) * T, y: hLines[r+1] * T, w: 5 * T, h: 3 * T, used: false });
-        if (c > 0 && vSegWall[r][c] === 1) validSpots.push({ x: vLines[c] * T, y: (hLines[r] + 4) * T, w: 3 * T, h: 5 * T, used: false });
-        if (c < cols - 1 && vSegWall[r][c+1] === 1) validSpots.push({ x: vLines[c+1] * T, y: (hLines[r] + 4) * T, w: 3 * T, h: 5 * T, used: false });
-        
-        const finalSpots = validSpots.filter(spot => {
+        // Horizontal wall above cell (hSegWall[r][c]) — wall spans x: vLines[c]+WALL_W to vLines[c+1], y: hLines[r], size CORR_W x WALL_W
+        if (r > 0 && hSegWall[r][c] === 1) {
+          const wx = vLines[c] + WALL_W;
+          const wy = hLines[r];
+          const wallW = (c + 1 < vLines.length ? vLines[c + 1] : MAP - B) - wx;
+          const lw = Math.min(5, wallW);
+          const lx = wx + Math.floor((wallW - lw) / 2);
+          validSpots.push({ x: lx * T, y: wy * T, w: lw * T, h: WALL_W * T, used: false });
+        }
+        // Horizontal wall below cell (hSegWall[r+1][c])
+        if (r < rows - 1 && hSegWall[r + 1][c] === 1) {
+          const wx = vLines[c] + WALL_W;
+          const wy = hLines[r + 1];
+          const wallW = (c + 1 < vLines.length ? vLines[c + 1] : MAP - B) - wx;
+          const lw = Math.min(5, wallW);
+          const lx = wx + Math.floor((wallW - lw) / 2);
+          validSpots.push({ x: lx * T, y: wy * T, w: lw * T, h: WALL_W * T, used: false });
+        }
+        // Vertical wall left of cell (vSegWall[r][c])
+        if (c > 0 && vSegWall[r][c] === 1) {
+          const wx = vLines[c];
+          const wy = hLines[r] + WALL_W;
+          const wallH = (r + 1 < hLines.length ? hLines[r + 1] : MAP - B) - wy;
+          const lh = Math.min(5, wallH);
+          const ly = wy + Math.floor((wallH - lh) / 2);
+          validSpots.push({ x: wx * T, y: ly * T, w: WALL_W * T, h: lh * T, used: false });
+        }
+        // Vertical wall right of cell (vSegWall[r][c+1])
+        if (c < cols - 1 && vSegWall[r][c + 1] === 1) {
+          const wx = vLines[c + 1];
+          const wy = hLines[r] + WALL_W;
+          const wallH = (r + 1 < hLines.length ? hLines[r + 1] : MAP - B) - wy;
+          const lh = Math.min(5, wallH);
+          const ly = wy + Math.floor((wallH - lh) / 2);
+          validSpots.push({ x: wx * T, y: ly * T, w: WALL_W * T, h: lh * T, used: false });
+        }
+        // Filter out top-left quadrant
+        return validSpots.filter(spot => {
           const tx = spot.x / T + (spot.w / T) / 2;
           const ty = spot.y / T + (spot.h / T) / 2;
           return !(tx < MAP / 2 && ty < MAP / 2);
         });
-
-        if (finalSpots.length > 0) return finalSpots[rngInt(finalSpots.length)];
-        return null;
       }
 
       let lockerSpot = null;
+      // First: try dead ends without oreos (index 2+)
       for (let i = 2; i < deadEnds.length; i++) {
-        lockerSpot = spawnLockerInDeadEnd(deadEnds[i]);
-        if (lockerSpot) break;
+        const spots = getLockerSpotsForCell(deadEnds[i][0], deadEnds[i][1]);
+        if (spots.length > 0) { lockerSpot = spots[rngInt(spots.length)]; break; }
       }
+      // Fallback: try dead ends with oreos (index 0-1)
       if (!lockerSpot) {
         for (let i = 0; i < Math.min(2, deadEnds.length); i++) {
-          lockerSpot = spawnLockerInDeadEnd(deadEnds[i]);
-          if (lockerSpot) break;
+          const spots = getLockerSpotsForCell(deadEnds[i][0], deadEnds[i][1]);
+          if (spots.length > 0) { lockerSpot = spots[rngInt(spots.length)]; break; }
+        }
+      }
+      // Last resort: try any non-border cell with a closed wall
+      if (!lockerSpot) {
+        const cellCandidates = [];
+        for (let r = 1; r < rows - 1; r++) for (let c = 1; c < cols - 1; c++) {
+          const spots = getLockerSpotsForCell(r, c);
+          if (spots.length > 0) cellCandidates.push(spots);
+        }
+        if (cellCandidates.length > 0) {
+          const pick = cellCandidates[rngInt(cellCandidates.length)];
+          lockerSpot = pick[rngInt(pick.length)];
         }
       }
       if (lockerSpot) lockers.push(lockerSpot);
@@ -988,6 +1030,25 @@
 
       if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
+        if (gameState === 'playing' && !won && !lost) {
+          if (playerInLocker) {
+            playerInLocker = false;
+            lockerTimer = 0;
+            recalcEnemyPath();
+          } else {
+            for (const locker of lockers) {
+              if (locker.used) continue;
+              if (player.x + PW / 2 > locker.x - T && player.x - PW / 2 < locker.x + locker.w + T &&
+                player.y + PH / 2 > locker.y - T && player.y - PH / 2 < locker.y + locker.h + T) {
+                playerInLocker = true;
+                lockerTimer = 5;
+                locker.used = true;
+                recalcEnemyPath();
+                break;
+              }
+            }
+          }
+        }
       }
 
       // Use inventory items
@@ -1165,18 +1226,6 @@
           playerInLocker = false;
           lockerTimer = 0;
           recalcEnemyPath();
-        }
-      } else {
-        for (const locker of lockers) {
-          if (locker.used) continue;
-          if (player.x + PW/2 > locker.x - T && player.x - PW/2 < locker.x + locker.w + T &&
-              player.y + PH/2 > locker.y - T && player.y - PH/2 < locker.y + locker.h + T) {
-            playerInLocker = true;
-            lockerTimer = 5;
-            locker.used = true;
-            recalcEnemyPath();
-            break;
-          }
         }
       }
 
@@ -1491,70 +1540,70 @@
       if (!playerInLocker) {
         const ppx = W / 2, ppy = H / 2, phw = PW / 2, phh = PH / 2;
 
-      ctx.fillStyle = 'rgba(0,0,0,0.15)';
-      ctx.beginPath();
-      ctx.ellipse(ppx + 1, ppy + phh + 3, phw * 0.8, 4, 0, 0, Math.PI * 2);
-      ctx.fill();
+        ctx.fillStyle = 'rgba(0,0,0,0.15)';
+        ctx.beginPath();
+        ctx.ellipse(ppx + 1, ppy + phh + 3, phw * 0.8, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
 
-      if (invincible) { ctx.save(); ctx.shadowColor = '#ffdd00'; ctx.shadowBlur = 20; }
+        if (invincible) { ctx.save(); ctx.shadowColor = '#ffdd00'; ctx.shadowBlur = 20; }
 
-      const br = 4;
-      const bodyColor = invincible ? '#ffd700' : '#ff6b6b';
-      const strokeColor = invincible ? '#daa520' : '#c0392b';
+        const br = 4;
+        const bodyColor = invincible ? '#ffd700' : '#ff6b6b';
+        const strokeColor = invincible ? '#daa520' : '#c0392b';
 
-      ctx.fillStyle = bodyColor; ctx.beginPath();
-      ctx.moveTo(ppx - phw + br, ppy - phh); ctx.lineTo(ppx + phw - br, ppy - phh);
-      ctx.quadraticCurveTo(ppx + phw, ppy - phh, ppx + phw, ppy - phh + br);
-      ctx.lineTo(ppx + phw, ppy + phh - br); ctx.quadraticCurveTo(ppx + phw, ppy + phh, ppx + phw - br, ppy + phh);
-      ctx.lineTo(ppx - phw + br, ppy + phh); ctx.quadraticCurveTo(ppx - phw, ppy + phh, ppx - phw, ppy + phh - br);
-      ctx.lineTo(ppx - phw, ppy - phh + br); ctx.quadraticCurveTo(ppx - phw, ppy - phh, ppx - phw + br, ppy - phh);
-      ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = strokeColor; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = bodyColor; ctx.beginPath();
+        ctx.moveTo(ppx - phw + br, ppy - phh); ctx.lineTo(ppx + phw - br, ppy - phh);
+        ctx.quadraticCurveTo(ppx + phw, ppy - phh, ppx + phw, ppy - phh + br);
+        ctx.lineTo(ppx + phw, ppy + phh - br); ctx.quadraticCurveTo(ppx + phw, ppy + phh, ppx + phw - br, ppy + phh);
+        ctx.lineTo(ppx - phw + br, ppy + phh); ctx.quadraticCurveTo(ppx - phw, ppy + phh, ppx - phw, ppy + phh - br);
+        ctx.lineTo(ppx - phw, ppy - phh + br); ctx.quadraticCurveTo(ppx - phw, ppy - phh, ppx - phw + br, ppy - phh);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = strokeColor; ctx.lineWidth = 2; ctx.stroke();
 
-      if (invincible) ctx.restore();
+        if (invincible) ctx.restore();
 
-      let peox = 0, peoy = 0;
-      if (player.dir === 0) peox = 2; else if (player.dir === 2) peox = -2;
-      if (player.dir === 1) peoy = 3; else if (player.dir === 3) peoy = -3;
+        let peox = 0, peoy = 0;
+        if (player.dir === 0) peox = 2; else if (player.dir === 2) peox = -2;
+        if (player.dir === 1) peoy = 3; else if (player.dir === 3) peoy = -3;
 
-      const pfaceY = ppy - phh * 0.35;
-      ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.arc(ppx - 6 + peox, pfaceY + peoy, 5, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(ppx + 6 + peox, pfaceY + peoy, 5, 0, Math.PI * 2); ctx.fill();
+        const pfaceY = ppy - phh * 0.35;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(ppx - 6 + peox, pfaceY + peoy, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(ppx + 6 + peox, pfaceY + peoy, 5, 0, Math.PI * 2); ctx.fill();
 
-      ctx.fillStyle = '#222';
-      ctx.beginPath(); ctx.arc(ppx - 5 + peox * 1.5, pfaceY + peoy * 1.2, 2.5, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(ppx + 7 + peox * 1.5, pfaceY + peoy * 1.2, 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#222';
+        ctx.beginPath(); ctx.arc(ppx - 5 + peox * 1.5, pfaceY + peoy * 1.2, 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(ppx + 7 + peox * 1.5, pfaceY + peoy * 1.2, 2.5, 0, Math.PI * 2); ctx.fill();
 
-      ctx.strokeStyle = strokeColor; ctx.lineWidth = 1.5; ctx.beginPath();
-      ctx.arc(ppx + peox * 0.5, pfaceY + 12 + peoy * 0.5, 4, 0.1 * Math.PI, 0.9 * Math.PI);
-      ctx.stroke();
+        ctx.strokeStyle = strokeColor; ctx.lineWidth = 1.5; ctx.beginPath();
+        ctx.arc(ppx + peox * 0.5, pfaceY + 12 + peoy * 0.5, 4, 0.1 * Math.PI, 0.9 * Math.PI);
+        ctx.stroke();
 
-      // Invincibility countdown
-      if (invincible) {
-        const countNum = Math.ceil(Math.max(...invincibleTimers));
-        ctx.fillStyle = '#ffdd00';
-        ctx.font = 'bold 22px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText(countNum, ppx, ppy - phh - 8);
-      }
-
-      // STUN HALO
-      if (playerStunned) {
-        const haloY = ppy - phh - 10;
-        const spinSpeed = Date.now() / 300;
-        const starCount = 5;
-        const haloRadius = 20;
-        ctx.font = '14px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        for (let i = 0; i < starCount; i++) {
-          const angle = spinSpeed + (i * Math.PI * 2 / starCount);
-          const ssx = ppx + Math.cos(angle) * haloRadius;
-          const ssy = haloY + Math.sin(angle) * (haloRadius * 0.4);
+        // Invincibility countdown
+        if (invincible) {
+          const countNum = Math.ceil(Math.max(...invincibleTimers));
           ctx.fillStyle = '#ffdd00';
-          ctx.fillText('⭐', ssx, ssy);
+          ctx.font = 'bold 22px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(countNum, ppx, ppy - phh - 8);
         }
-      }
+
+        // STUN HALO
+        if (playerStunned) {
+          const haloY = ppy - phh - 10;
+          const spinSpeed = Date.now() / 300;
+          const starCount = 5;
+          const haloRadius = 20;
+          ctx.font = '14px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          for (let i = 0; i < starCount; i++) {
+            const angle = spinSpeed + (i * Math.PI * 2 / starCount);
+            const ssx = ppx + Math.cos(angle) * haloRadius;
+            const ssy = haloY + Math.sin(angle) * (haloRadius * 0.4);
+            ctx.fillStyle = '#ffdd00';
+            ctx.fillText('⭐', ssx, ssy);
+          }
+        }
       }
 
       // HUD
