@@ -1038,8 +1038,8 @@
           } else {
             for (const locker of lockers) {
               if (locker.used) continue;
-              if (player.x + PW / 2 > locker.x - T && player.x - PW / 2 < locker.x + locker.w + T &&
-                player.y + PH / 2 > locker.y - T && player.y - PH / 2 < locker.y + locker.h + T) {
+              if (player.x + PW / 2 > locker.x - 2 * T && player.x - PW / 2 < locker.x + locker.w + 2 * T &&
+                player.y + PH / 2 > locker.y - 2 * T && player.y - PH / 2 < locker.y + locker.h + 2 * T) {
                 playerInLocker = true;
                 lockerTimer = 5;
                 locker.used = true;
