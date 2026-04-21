@@ -1051,6 +1051,10 @@
         }
       }
 
+      if ((e.key === 'q' || e.key === 'Q') && (gameState === 'won' || gameState === 'lost' || gameState === 'playing')) {
+        startGame();
+      }
+
       // Use inventory items
       if ((e.key === 'a' || e.key === 'A') && gameState === 'playing') {
         if (inventory[0] === 'oreo') { inventory[0] = null; invincibleTimers.push(INVINCIBLE_DURATION); }
