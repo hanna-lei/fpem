@@ -602,6 +602,7 @@
     let enemyMoving = false;
 
     let won = false, lost = false, startTime = 0, elapsed = '0.0';
+    let roundPrepared = false;
 
     // ============ STAMINA ============
     const MAX_STAMINA = 50;
@@ -617,6 +618,10 @@
     let sprinting = false;
     let sprintExhausted = false;
 
+    // ============ DARKNESS ============
+    let darknessEnabled = false;
+    const DARKNESS_RADIUS = 15 * T;
+
     // ============ REPATH TIMER ============
     const ENEMY_REPATH_INTERVAL = 0.5;
     let enemyRepathTimer = 0;
@@ -630,7 +635,19 @@
     }
     function cellKey(r, c) { return r + ',' + c; }
 
-    function startGame() {
+    function beginGameplay() {
+      if (!roundPrepared) return;
+      won = false;
+      lost = false;
+      startTime = Date.now();
+      elapsed = '0.0';
+      gameState = 'playing';
+      lastTime = performance.now();
+      bgMusic.play();
+    }
+
+    function startGame(options = {}) {
+      const { autoStart = true } = options;
       const masterSeed = Date.now();
       exitCorner = chooseExitCorner(masterSeed);
       enemyVariant = chooseEnemyVariant(masterSeed);
@@ -696,7 +713,6 @@
 
       won = false;
       lost = false;
-      startTime = Date.now();
       elapsed = '0.0';
 
       stamina = MAX_STAMINA;
@@ -710,8 +726,7 @@
       kitkatSlowTimers.length = 0;
       kitkatSlowActive = false;
 
-      gameState = 'playing';
-      bgMusic.play();
+      roundPrepared = true;
 
       // Reset inventory and pickups
       inventory[0] = null; inventory[1] = null; inventory[2] = null;
@@ -887,6 +902,13 @@
       }
       if (lockerSpot) lockers.push(lockerSpot);
 
+      if (autoStart) {
+        beginGameplay();
+      } else {
+        gameState = 'settings';
+        bgMusic.pause();
+      }
+
       console.log(`Seed: ${chosenSeed}, Exit: ${exitCorner}, Enemy: ${enemyVariant.name}`);
     }
 
@@ -985,11 +1007,97 @@
       }
     }
 
+    // ============ SETTINGS SCREEN ============
+    function getSettingsToggleRect() {
+      const W = canvas.width, H = canvas.height;
+      const tw = 60, th = 30;
+      return { x: W / 2 - tw / 2, y: H / 2 - 80, w: tw, h: th };
+    }
+
+    function getSettingsStartRect() {
+      const W = canvas.width, H = canvas.height;
+      const btnW = 280, btnH = 50;
+      return { x: W / 2 - btnW / 2, y: H / 2 + 20, w: btnW, h: btnH };
+    }
+
+    function renderSettings() {
+      const W = canvas.width, H = canvas.height;
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      ctx.fillStyle = '#f0e6d3';
+      ctx.font = 'bold 36px Arial';
+      ctx.fillText('Game Settings', W / 2, H / 2 - 150);
+
+      // Darkness toggle label
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 22px Arial';
+      ctx.fillText('Darkness', W / 2, H / 2 - 115);
+
+      // Toggle track
+      const tog = getSettingsToggleRect();
+      ctx.fillStyle = darknessEnabled ? '#4caf50' : '#555';
+      const togR = tog.h / 2;
+      ctx.beginPath();
+      ctx.arc(tog.x + togR, tog.y + togR, togR, Math.PI * 0.5, Math.PI * 1.5);
+      ctx.arc(tog.x + tog.w - togR, tog.y + togR, togR, Math.PI * 1.5, Math.PI * 0.5);
+      ctx.closePath();
+      ctx.fill();
+
+      // Toggle knob
+      ctx.fillStyle = '#fff';
+      const knobX = darknessEnabled ? tog.x + tog.w - togR : tog.x + togR;
+      ctx.beginPath();
+      ctx.arc(knobX, tog.y + togR, togR - 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Description
+      ctx.fillStyle = '#aaa';
+      ctx.font = '16px Arial';
+      ctx.fillText(darknessEnabled ? 'The maze will be shrouded in darkness.' : 'Normal visibility.', W / 2, H / 2 - 40);
+
+      // Start button
+      const sr = getSettingsStartRect();
+      const isHovered = mouseX >= sr.x && mouseX <= sr.x + sr.w && mouseY >= sr.y && mouseY <= sr.y + sr.h;
+      ctx.fillStyle = isHovered ? '#5a5a7e' : '#3a3a5e';
+      ctx.strokeStyle = isHovered ? '#888' : '#666';
+      const br = 10;
+      ctx.beginPath();
+      ctx.moveTo(sr.x + br, sr.y); ctx.lineTo(sr.x + sr.w - br, sr.y);
+      ctx.quadraticCurveTo(sr.x + sr.w, sr.y, sr.x + sr.w, sr.y + br);
+      ctx.lineTo(sr.x + sr.w, sr.y + sr.h - br);
+      ctx.quadraticCurveTo(sr.x + sr.w, sr.y + sr.h, sr.x + sr.w - br, sr.y + sr.h);
+      ctx.lineTo(sr.x + br, sr.y + sr.h);
+      ctx.quadraticCurveTo(sr.x, sr.y + sr.h, sr.x, sr.y + sr.h - br);
+      ctx.lineTo(sr.x, sr.y + br);
+      ctx.quadraticCurveTo(sr.x, sr.y, sr.x + br, sr.y);
+      ctx.closePath();
+      ctx.fill(); ctx.lineWidth = 2; ctx.stroke();
+
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 22px Arial';
+      ctx.fillText('Start', sr.x + sr.w / 2, sr.y + sr.h / 2);
+    }
+
     canvas.addEventListener('click', () => {
       if (gameState === 'menu') {
         const btn = getHoveredButton();
         if (btn && btn.active) {
-          if (btn.label === 'Randomize') startGame();
+          if (btn.label === 'Randomize') {
+            startGame({ autoStart: false });
+          }
+        }
+      } else if (gameState === 'settings') {
+        const tog = getSettingsToggleRect();
+        if (mouseX >= tog.x && mouseX <= tog.x + tog.w && mouseY >= tog.y && mouseY <= tog.y + tog.h) {
+          darknessEnabled = !darknessEnabled;
+        }
+        const sr = getSettingsStartRect();
+        if (mouseX >= sr.x && mouseX <= sr.x + sr.w && mouseY >= sr.y && mouseY <= sr.y + sr.h) {
+          beginGameplay();
         }
       } else if (gameState === 'won' || gameState === 'lost') {
         const btn = getHoveredEndGameButton();
@@ -1053,6 +1161,14 @@
 
       if ((e.key === 'q' || e.key === 'Q') && (gameState === 'won' || gameState === 'lost' || gameState === 'playing')) {
         startGame();
+      }
+
+      if ((e.key === 'w' || e.key === 'W') && gameState === 'playing') {
+        gameState = 'menu';
+        won = false;
+        lost = false;
+        bgMusic.pause();
+        bgMusic.currentTime = 0;
       }
 
       // Use inventory items
@@ -1611,6 +1727,27 @@
         }
       }
 
+      // Darkness overlay
+      if (darknessEnabled) {
+        const darkCanvas = document.createElement('canvas');
+        darkCanvas.width = W; darkCanvas.height = H;
+        const dctx = darkCanvas.getContext('2d');
+        dctx.fillStyle = '#000';
+        dctx.fillRect(0, 0, W, H);
+        dctx.globalCompositeOperation = 'destination-out';
+        const cx = playerInLocker ? (player.x - camX) : W / 2;
+        const cy = playerInLocker ? (player.y - camY) : H / 2;
+        const grad = dctx.createRadialGradient(cx, cy, DARKNESS_RADIUS * 0.4, cx, cy, DARKNESS_RADIUS);
+        grad.addColorStop(0, 'rgba(0,0,0,1)');
+        grad.addColorStop(0.7, 'rgba(0,0,0,0.8)');
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        dctx.fillStyle = grad;
+        dctx.beginPath();
+        dctx.arc(cx, cy, DARKNESS_RADIUS, 0, Math.PI * 2);
+        dctx.fill();
+        ctx.drawImage(darkCanvas, 0, 0);
+      }
+
       // HUD
       ctx.fillStyle = '#fff';
       ctx.font = '16px Arial';
@@ -1707,6 +1844,7 @@
     function loop() {
       update();
       if (gameState === 'menu') renderMenu();
+      else if (gameState === 'settings') renderSettings();
       else renderGame();
       requestAnimationFrame(loop);
     }
