@@ -880,34 +880,32 @@
       return null;
     }
 
-    canvas.addEventListener('click', () => {
-      if (gameState === 'menu') {
-        const btn = getHoveredButton();
-        if (btn && btn.active) {
-          if (btn.label === 'Randomize') startGame();
-        }
-      }
-    });
-
-    function renderMenu() {
+    function getEndGameButtonRects() {
       const W = canvas.width, H = canvas.height;
-      ctx.fillStyle = '#1a1a2e';
-      ctx.fillRect(0, 0, W, H);
+      const btnW = 280, btnH = 50, gap = 18;
+      const startY = H / 2 + 55;
+      const buttons = [
+        { label: 'New Round', active: true },
+        { label: 'Main Menu', active: true }
+      ];
+      return buttons.map((btn, i) => ({
+        x: W / 2 - btnW / 2,
+        y: startY + i * (btnH + gap),
+        w: btnW,
+        h: btnH,
+        ...btn
+      }));
+    }
 
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
+    function getHoveredEndGameButton() {
+      const rects = getEndGameButtonRects();
+      for (const r of rects) {
+        if (mouseX >= r.x && mouseX <= r.x + r.w && mouseY >= r.y && mouseY <= r.y + r.h) return r;
+      }
+      return null;
+    }
 
-      ctx.fillStyle = '#f0e6d3';
-      ctx.font = 'bold 42px Arial';
-      ctx.fillText('Fundamental Paper Education', W / 2, H / 2 - 120);
-
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 56px Arial';
-      ctx.fillText('MAZE', W / 2, H / 2 - 60);
-
-      const rects = getButtonRects();
-      const hovered = getHoveredButton();
-
+    function drawButtons(rects, hovered) {
       for (const r of rects) {
         const isHovered = hovered && hovered.label === r.label;
         const isActive = r.active;
@@ -945,6 +943,42 @@
       }
     }
 
+    canvas.addEventListener('click', () => {
+      if (gameState === 'menu') {
+        const btn = getHoveredButton();
+        if (btn && btn.active) {
+          if (btn.label === 'Randomize') startGame();
+        }
+      } else if (gameState === 'won' || gameState === 'lost') {
+        const btn = getHoveredEndGameButton();
+        if (btn && btn.active) {
+          if (btn.label === 'New Round') startGame();
+          else if (btn.label === 'Main Menu') gameState = 'menu';
+        }
+      }
+    });
+
+    function renderMenu() {
+      const W = canvas.width, H = canvas.height;
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      ctx.fillStyle = '#f0e6d3';
+      ctx.font = 'bold 42px Arial';
+      ctx.fillText('Fundamental Paper Education', W / 2, H / 2 - 120);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 56px Arial';
+      ctx.fillText('MAZE', W / 2, H / 2 - 60);
+
+      const rects = getButtonRects();
+      const hovered = getHoveredButton();
+      drawButtons(rects, hovered);
+    }
+
     // ============ INPUT ============
     const keys = {};
     document.addEventListener('keydown', e => {
@@ -954,7 +988,6 @@
 
       if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
-        if (gameState === 'won' || gameState === 'lost' || gameState === 'playing') startGame();
       }
 
       // Use inventory items
@@ -1598,8 +1631,9 @@
         ctx.fillText('🎉 YOU WIN! 🎉', W / 2, H / 2 - 30);
         ctx.fillStyle = '#fff'; ctx.font = '24px Arial';
         ctx.fillText(`Escaped ${enemyVariant.name} in ${elapsed} seconds!`, W / 2, H / 2 + 25);
-        ctx.fillStyle = '#aaa'; ctx.font = '18px Arial';
-        ctx.fillText('Press SPACE for new round', W / 2, H / 2 + 65);
+        const rects = getEndGameButtonRects();
+        const hovered = getHoveredEndGameButton();
+        drawButtons(rects, hovered);
       }
 
       if (gameState === 'lost') {
@@ -1609,8 +1643,9 @@
         ctx.fillText(`💀 ${enemyVariant.name.toUpperCase()}! 💀`, W / 2, H / 2 - 30);
         ctx.fillStyle = '#fff'; ctx.font = '24px Arial';
         ctx.fillText(`Caught after ${elapsed} seconds`, W / 2, H / 2 + 25);
-        ctx.fillStyle = '#aaa'; ctx.font = '18px Arial';
-        ctx.fillText('Press SPACE for new round', W / 2, H / 2 + 65);
+        const rects = getEndGameButtonRects();
+        const hovered = getHoveredEndGameButton();
+        drawButtons(rects, hovered);
       }
     }
 
