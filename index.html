@@ -621,6 +621,9 @@
     // ============ DARKNESS ============
     let darknessEnabled = false;
     const DARKNESS_RADIUS = 15 * T;
+    /** Slightly past gameplay radius so the vignette eases out more gradually */
+    const DARKNESS_GRADIENT_OUTER = DARKNESS_RADIUS * 1.12;
+    const PLAYER_RED_GLOW_RADIUS = 10 * T;
 
     // ============ REPATH TIMER ============
     const ENEMY_REPATH_INTERVAL = 0.5;
@@ -1204,15 +1207,26 @@
       if (path.length > 0) {
         path.push({ x: targetX, y: targetY });
 
-        let targetIdx = 0;
         const hw = enemyVariant.w / 2, hh = enemyVariant.h / 2;
+        const goal = path[path.length - 1];
+        const dEnemyGoal = Math.hypot(enemy.x - goal.x, enemy.y - goal.y);
+        const goalSlack = T * 0.75;
+
+        let targetIdx = 0;
+        let fallbackIdx = -1;
+        let pickedWithGoalFilter = false;
 
         for (let i = path.length - 1; i >= 0; i--) {
-          if (hasLineOfSight(enemy.x, enemy.y, path[i].x, path[i].y, hw, hh)) {
+          if (!hasLineOfSight(enemy.x, enemy.y, path[i].x, path[i].y, hw, hh)) continue;
+          if (fallbackIdx < 0) fallbackIdx = i;
+          const dWpGoal = Math.hypot(path[i].x - goal.x, path[i].y - goal.y);
+          if (dWpGoal <= dEnemyGoal + goalSlack) {
             targetIdx = i;
+            pickedWithGoalFilter = true;
             break;
           }
         }
+        if (!pickedWithGoalFilter && fallbackIdx >= 0) targetIdx = fallbackIdx;
 
         enemyWaypoints = path;
         enemyWpIdx = targetIdx;
@@ -1240,7 +1254,8 @@
       const dy = y2 - y1;
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist === 0) return true;
-      const steps = Math.ceil(dist / (T / 2)); // Check every half tile
+      const step = dist < 4 * T ? T / 4 : T / 2;
+      const steps = Math.max(4, Math.ceil(dist / step));
       for (let i = 1; i <= steps; i++) {
         const px = x1 + (dx / steps) * i;
         const py = y1 + (dy / steps) * i;
@@ -1661,6 +1676,17 @@
       if (!playerInLocker) {
         const ppx = W / 2, ppy = H / 2, phw = PW / 2, phh = PH / 2;
 
+        // Faint red glow behind the player (under body/shadow)
+        const redGlow = ctx.createRadialGradient(ppx, ppy, 0, ppx, ppy, PLAYER_RED_GLOW_RADIUS);
+        redGlow.addColorStop(0, 'rgba(220, 70, 70, 0.3)');
+        redGlow.addColorStop(0.35, 'rgba(200, 45, 45, 0.15)');
+        redGlow.addColorStop(0.65, 'rgba(170, 35, 35, 0.06)');
+        redGlow.addColorStop(1, 'rgba(140, 25, 25, 0)');
+        ctx.fillStyle = redGlow;
+        ctx.beginPath();
+        ctx.arc(ppx, ppy, PLAYER_RED_GLOW_RADIUS, 0, Math.PI * 2);
+        ctx.fill();
+
         ctx.fillStyle = 'rgba(0,0,0,0.15)';
         ctx.beginPath();
         ctx.ellipse(ppx + 1, ppy + phh + 3, phw * 0.8, 4, 0, 0, Math.PI * 2);
@@ -1737,13 +1763,18 @@
         dctx.globalCompositeOperation = 'destination-out';
         const cx = playerInLocker ? (player.x - camX) : W / 2;
         const cy = playerInLocker ? (player.y - camY) : H / 2;
-        const grad = dctx.createRadialGradient(cx, cy, DARKNESS_RADIUS * 0.4, cx, cy, DARKNESS_RADIUS);
+        const innerR = DARKNESS_RADIUS * 0.12;
+        const grad = dctx.createRadialGradient(cx, cy, innerR, cx, cy, DARKNESS_GRADIENT_OUTER);
         grad.addColorStop(0, 'rgba(0,0,0,1)');
-        grad.addColorStop(0.7, 'rgba(0,0,0,0.8)');
+        grad.addColorStop(0.18, 'rgba(0,0,0,0.97)');
+        grad.addColorStop(0.38, 'rgba(0,0,0,0.82)');
+        grad.addColorStop(0.58, 'rgba(0,0,0,0.52)');
+        grad.addColorStop(0.76, 'rgba(0,0,0,0.24)');
+        grad.addColorStop(0.9, 'rgba(0,0,0,0.08)');
         grad.addColorStop(1, 'rgba(0,0,0,0)');
         dctx.fillStyle = grad;
         dctx.beginPath();
-        dctx.arc(cx, cy, DARKNESS_RADIUS, 0, Math.PI * 2);
+        dctx.arc(cx, cy, DARKNESS_GRADIENT_OUTER, 0, Math.PI * 2);
         dctx.fill();
         ctx.drawImage(darkCanvas, 0, 0);
       }
