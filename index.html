@@ -603,6 +603,8 @@
 
     let won = false, lost = false, startTime = 0, elapsed = '0.0';
     let roundPrepared = false;
+    /** After end screen → Game Settings, Start must run a full new round (not resume the finished one). */
+    let settingsStartLaunchesNewRound = false;
 
     // ============ STAMINA ============
     const MAX_STAMINA = 50;
@@ -651,6 +653,7 @@
 
     function startGame(options = {}) {
       const { autoStart = true } = options;
+      settingsStartLaunchesNewRound = false;
       const masterSeed = Date.now();
       exitCorner = chooseExitCorner(masterSeed);
       enemyVariant = chooseEnemyVariant(masterSeed);
@@ -953,6 +956,7 @@
       const startY = H / 2 + 55;
       const buttons = [
         { label: 'New Round', active: true },
+        { label: 'Game Settings', active: true },
         { label: 'Main Menu', active: true }
       ];
       return buttons.map((btn, i) => ({
@@ -1100,12 +1104,17 @@
         }
         const sr = getSettingsStartRect();
         if (mouseX >= sr.x && mouseX <= sr.x + sr.w && mouseY >= sr.y && mouseY <= sr.y + sr.h) {
-          beginGameplay();
+          if (settingsStartLaunchesNewRound) startGame();
+          else beginGameplay();
         }
       } else if (gameState === 'won' || gameState === 'lost') {
         const btn = getHoveredEndGameButton();
         if (btn && btn.active) {
           if (btn.label === 'New Round') startGame();
+          else if (btn.label === 'Game Settings') {
+            settingsStartLaunchesNewRound = true;
+            gameState = 'settings';
+          }
           else if (btn.label === 'Main Menu') gameState = 'menu';
         }
       }
@@ -1172,6 +1181,13 @@
         lost = false;
         bgMusic.pause();
         bgMusic.currentTime = 0;
+      }
+
+      if ((e.key === 'e' || e.key === 'E') && gameState === 'playing' && !won && !lost) {
+        e.preventDefault();
+        gameState = 'settings';
+        bgMusic.pause();
+        settingsStartLaunchesNewRound = true;
       }
 
       // Use inventory items
@@ -1676,16 +1692,18 @@
       if (!playerInLocker) {
         const ppx = W / 2, ppy = H / 2, phw = PW / 2, phh = PH / 2;
 
-        // Faint red glow behind the player (under body/shadow)
-        const redGlow = ctx.createRadialGradient(ppx, ppy, 0, ppx, ppy, PLAYER_RED_GLOW_RADIUS);
-        redGlow.addColorStop(0, 'rgba(220, 70, 70, 0.3)');
-        redGlow.addColorStop(0.35, 'rgba(200, 45, 45, 0.15)');
-        redGlow.addColorStop(0.65, 'rgba(170, 35, 35, 0.06)');
-        redGlow.addColorStop(1, 'rgba(140, 25, 25, 0)');
-        ctx.fillStyle = redGlow;
-        ctx.beginPath();
-        ctx.arc(ppx, ppy, PLAYER_RED_GLOW_RADIUS, 0, Math.PI * 2);
-        ctx.fill();
+        // Faint red glow only when darkness is enabled
+        if (darknessEnabled) {
+          const redGlow = ctx.createRadialGradient(ppx, ppy, 0, ppx, ppy, PLAYER_RED_GLOW_RADIUS);
+          redGlow.addColorStop(0, 'rgba(220, 70, 70, 0.3)');
+          redGlow.addColorStop(0.35, 'rgba(200, 45, 45, 0.15)');
+          redGlow.addColorStop(0.65, 'rgba(170, 35, 35, 0.06)');
+          redGlow.addColorStop(1, 'rgba(140, 25, 25, 0)');
+          ctx.fillStyle = redGlow;
+          ctx.beginPath();
+          ctx.arc(ppx, ppy, PLAYER_RED_GLOW_RADIUS, 0, Math.PI * 2);
+          ctx.fill();
+        }
 
         ctx.fillStyle = 'rgba(0,0,0,0.15)';
         ctx.beginPath();
