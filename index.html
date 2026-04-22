@@ -1221,28 +1221,33 @@
       const path = bfsCellPath(eCell.r, eCell.c, pCell.r, pCell.c);
 
       if (path.length > 0) {
+        // Always end at the exact target point
         path.push({ x: targetX, y: targetY });
 
         const hw = enemyVariant.w / 2, hh = enemyVariant.h / 2;
-        const goal = path[path.length - 1];
-        const dEnemyGoal = Math.hypot(enemy.x - goal.x, enemy.y - goal.y);
-        const goalSlack = T * 0.75;
 
-        let targetIdx = 0;
-        let fallbackIdx = -1;
-        let pickedWithGoalFilter = false;
+        // 1) Find the closest waypoint on the new path to where the enemy is now.
+        // This prevents "teleporting" the index to a far place that causes oscillation.
+        let closestIdx = 0;
+        let closestD2 = Infinity;
+        for (let i = 0; i < path.length; i++) {
+          const dx = path[i].x - enemy.x;
+          const dy = path[i].y - enemy.y;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < closestD2) { closestD2 = d2; closestIdx = i; }
+        }
 
-        for (let i = path.length - 1; i >= 0; i--) {
-          if (!hasLineOfSight(enemy.x, enemy.y, path[i].x, path[i].y, hw, hh)) continue;
-          if (fallbackIdx < 0) fallbackIdx = i;
-          const dWpGoal = Math.hypot(path[i].x - goal.x, path[i].y - goal.y);
-          if (dWpGoal <= dEnemyGoal + goalSlack) {
+        // 2) Start from the closest point, then allow skipping forward a LITTLE
+        // if line-of-sight is clear. Small skip prevents corner wobble.
+        const MAX_SKIP = 3; // try 2-5; 3 is a good start
+        let targetIdx = closestIdx;
+
+        for (let i = Math.min(path.length - 1, closestIdx + MAX_SKIP); i >= closestIdx; i--) {
+          if (hasLineOfSight(enemy.x, enemy.y, path[i].x, path[i].y, hw, hh)) {
             targetIdx = i;
-            pickedWithGoalFilter = true;
             break;
           }
         }
-        if (!pickedWithGoalFilter && fallbackIdx >= 0) targetIdx = fallbackIdx;
 
         enemyWaypoints = path;
         enemyWpIdx = targetIdx;
