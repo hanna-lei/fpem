@@ -622,9 +622,8 @@
 
     // ============ DARKNESS ============
     let darknessEnabled = false;
-    const DARKNESS_RADIUS = 15 * T;
-    /** Slightly past gameplay radius so the vignette eases out more gradually */
-    const DARKNESS_GRADIENT_OUTER = DARKNESS_RADIUS * 1.12;
+    let darknessRadiusTiles = 15;
+    let isDraggingSlider = false;
     const PLAYER_RED_GLOW_RADIUS = 10 * T;
 
     // ============ REPATH TIMER ============
@@ -927,7 +926,31 @@
     ];
 
     let mouseX = 0, mouseY = 0;
-    canvas.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
+    canvas.addEventListener('mousemove', e => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+
+      if (isDraggingSlider && gameState === 'settings' && darknessEnabled) {
+        const sr = getSettingsSliderRect();
+        let val = (mouseX - sr.x) / sr.w;
+        val = Math.max(0, Math.min(1, val));
+        darknessRadiusTiles = 15 + Math.round(val * 10);
+      }
+    });
+
+    canvas.addEventListener('mousedown', e => {
+      if (gameState === 'settings' && darknessEnabled) {
+        const sr = getSettingsSliderRect();
+        if (mouseX >= sr.x - 10 && mouseX <= sr.x + sr.w + 10 && mouseY >= sr.y - 10 && mouseY <= sr.y + sr.h + 10) {
+          isDraggingSlider = true;
+          let val = (mouseX - sr.x) / sr.w;
+          val = Math.max(0, Math.min(1, val));
+          darknessRadiusTiles = 15 + Math.round(val * 10);
+        }
+      }
+    });
+
+    canvas.addEventListener('mouseup', () => { isDraggingSlider = false; });
 
     function getButtonRects() {
       const W = canvas.width, H = canvas.height;
@@ -1021,10 +1044,16 @@
       return { x: W / 2 - tw / 2, y: H / 2 - 80, w: tw, h: th };
     }
 
+    function getSettingsSliderRect() {
+      const W = canvas.width, H = canvas.height;
+      const w = 200, h = 10;
+      return { x: W / 2 - w / 2, y: H / 2 - 10, w, h };
+    }
+
     function getSettingsStartRect() {
       const W = canvas.width, H = canvas.height;
       const btnW = 280, btnH = 50;
-      return { x: W / 2 - btnW / 2, y: H / 2 + 20, w: btnW, h: btnH };
+      return { x: W / 2 - btnW / 2, y: H / 2 + 50, w: btnW, h: btnH };
     }
 
     function renderSettings() {
@@ -1065,6 +1094,29 @@
       ctx.fillStyle = '#aaa';
       ctx.font = '16px Arial';
       ctx.fillText(darknessEnabled ? 'The maze will be shrouded in darkness.' : 'Normal visibility.', W / 2, H / 2 - 40);
+
+      // Slider
+      if (darknessEnabled) {
+        const slr = getSettingsSliderRect();
+
+        ctx.fillStyle = '#333';
+        ctx.fillRect(slr.x, slr.y, slr.w, slr.h);
+
+        const fillPct = (darknessRadiusTiles - 15) / 10;
+        const fillW = fillPct * slr.w;
+        ctx.fillStyle = '#4caf50';
+        ctx.fillRect(slr.x, slr.y, fillW, slr.h);
+
+        const knobX = slr.x + fillW;
+        ctx.beginPath();
+        ctx.arc(knobX, slr.y + slr.h / 2, 8, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+
+        ctx.fillStyle = '#aaa';
+        ctx.font = '14px Arial';
+        ctx.fillText(`Light amount: ${darknessRadiusTiles} tiles`, W / 2, slr.y + 25);
+      }
 
       // Start button
       const sr = getSettingsStartRect();
@@ -1226,31 +1278,47 @@
 
         const hw = enemyVariant.w / 2, hh = enemyVariant.h / 2;
 
-        // 1) Find the closest waypoint on the new path to where the enemy is now.
-        // This prevents "teleporting" the index to a far place that causes oscillation.
-        let closestIdx = 0;
-        let closestD2 = Infinity;
-        for (let i = 0; i < path.length; i++) {
-          const dx = path[i].x - enemy.x;
-          const dy = path[i].y - enemy.y;
-          const d2 = dx * dx + dy * dy;
-          if (d2 < closestD2) { closestD2 = d2; closestIdx = i; }
+        let targetIdx = 0;
+        let foundTarget = false;
+
+        // 1) If we were already moving towards a specific waypoint, try to find it in the new path
+        // This prevents going backward to the closest cell center when recalculating.
+        if (enemyWaypoints && enemyWaypoints.length > 0 && enemyWpIdx < enemyWaypoints.length) {
+          const currentTarget = enemyWaypoints[enemyWpIdx];
+          for (let i = 0; i < path.length; i++) {
+            if (path[i].x === currentTarget.x && path[i].y === currentTarget.y) {
+              targetIdx = i;
+              foundTarget = true;
+              break;
+            }
+          }
         }
 
-        // 2) Start from the closest point, then allow skipping forward a LITTLE
-        // if line-of-sight is clear. Small skip prevents corner wobble.
-        const MAX_SKIP = 3; // try 2-5; 3 is a good start
-        let targetIdx = closestIdx;
+        // 2) Fallback to finding the closest waypoint on the new path to where the enemy is now.
+        if (!foundTarget) {
+          let closestD2 = Infinity;
+          for (let i = 0; i < path.length; i++) {
+            const dx = path[i].x - enemy.x;
+            const dy = path[i].y - enemy.y;
+            const d2 = dx * dx + dy * dy;
+            if (d2 < closestD2) { closestD2 = d2; targetIdx = i; }
+          }
+        }
 
-        for (let i = Math.min(path.length - 1, closestIdx + MAX_SKIP); i >= closestIdx; i--) {
+        // 3) Start from the target index, then allow skipping forward a LITTLE
+        // if line-of-sight is clear. Small skip prevents corner wobble while smoothing movement.
+        const MAX_SKIP = 3;
+        let finalTargetIdx = targetIdx;
+
+        for (let i = Math.min(path.length - 1, targetIdx + MAX_SKIP); i > targetIdx; i--) {
           if (hasLineOfSight(enemy.x, enemy.y, path[i].x, path[i].y, hw, hh)) {
-            targetIdx = i;
+            finalTargetIdx = i;
             break;
           }
         }
 
         enemyWaypoints = path;
-        enemyWpIdx = targetIdx;
+        enemyWpIdx = finalTargetIdx;
       } else {
         enemyWaypoints = [{ x: targetX, y: targetY }];
         enemyWpIdx = 0;
@@ -1694,21 +1762,22 @@
       }
 
       // Player
-      if (!playerInLocker) {
-        const ppx = W / 2, ppy = H / 2, phw = PW / 2, phh = PH / 2;
+      const ppx = W / 2, ppy = H / 2, phw = PW / 2, phh = PH / 2;
 
-        // Faint red glow only when darkness is enabled
-        if (darknessEnabled) {
-          const redGlow = ctx.createRadialGradient(ppx, ppy, 0, ppx, ppy, PLAYER_RED_GLOW_RADIUS);
-          redGlow.addColorStop(0, 'rgba(220, 70, 70, 0.3)');
-          redGlow.addColorStop(0.35, 'rgba(200, 45, 45, 0.15)');
-          redGlow.addColorStop(0.65, 'rgba(170, 35, 35, 0.06)');
-          redGlow.addColorStop(1, 'rgba(140, 25, 25, 0)');
-          ctx.fillStyle = redGlow;
-          ctx.beginPath();
-          ctx.arc(ppx, ppy, PLAYER_RED_GLOW_RADIUS, 0, Math.PI * 2);
-          ctx.fill();
-        }
+      // Faint red glow only when darkness is enabled
+      if (darknessEnabled) {
+        const redGlow = ctx.createRadialGradient(ppx, ppy, 0, ppx, ppy, PLAYER_RED_GLOW_RADIUS);
+        redGlow.addColorStop(0, 'rgba(220, 70, 70, 0.3)');
+        redGlow.addColorStop(0.35, 'rgba(200, 45, 45, 0.15)');
+        redGlow.addColorStop(0.65, 'rgba(170, 35, 35, 0.06)');
+        redGlow.addColorStop(1, 'rgba(140, 25, 25, 0)');
+        ctx.fillStyle = redGlow;
+        ctx.beginPath();
+        ctx.arc(ppx, ppy, PLAYER_RED_GLOW_RADIUS, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      if (!playerInLocker) {
 
         ctx.fillStyle = 'rgba(0,0,0,0.15)';
         ctx.beginPath();
@@ -1786,8 +1855,10 @@
         dctx.globalCompositeOperation = 'destination-out';
         const cx = playerInLocker ? (player.x - camX) : W / 2;
         const cy = playerInLocker ? (player.y - camY) : H / 2;
-        const innerR = DARKNESS_RADIUS * 0.12;
-        const grad = dctx.createRadialGradient(cx, cy, innerR, cx, cy, DARKNESS_GRADIENT_OUTER);
+        const currentDarknessRadius = darknessRadiusTiles * T;
+        const currentDarknessOuter = currentDarknessRadius * 1.12;
+        const innerR = currentDarknessRadius * 0.12;
+        const grad = dctx.createRadialGradient(cx, cy, innerR, cx, cy, currentDarknessOuter);
         grad.addColorStop(0, 'rgba(0,0,0,1)');
         grad.addColorStop(0.18, 'rgba(0,0,0,0.97)');
         grad.addColorStop(0.38, 'rgba(0,0,0,0.82)');
@@ -1797,7 +1868,7 @@
         grad.addColorStop(1, 'rgba(0,0,0,0)');
         dctx.fillStyle = grad;
         dctx.beginPath();
-        dctx.arc(cx, cy, DARKNESS_GRADIENT_OUTER, 0, Math.PI * 2);
+        dctx.arc(cx, cy, currentDarknessOuter, 0, Math.PI * 2);
         dctx.fill();
         ctx.drawImage(darkCanvas, 0, 0);
       }
