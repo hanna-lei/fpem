@@ -933,8 +933,9 @@
 
     let mouseX = 0, mouseY = 0;
     canvas.addEventListener('mousemove', e => {
-      mouseX = e.clientX;
-      mouseY = e.clientY;
+      const rect = canvas.getBoundingClientRect();
+      mouseX = e.clientX - rect.left;
+      mouseY = e.clientY - rect.top;
 
       if (gameState === 'settings') {
         const layout = getSettingsLayout();
