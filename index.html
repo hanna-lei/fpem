@@ -197,6 +197,7 @@
     const lockers = [];
     let playerInLocker = false;
     let lockerTimer = 0;
+    let activeLockerIndex = -1;
 
     // Inventory: can hold 'oreo', 'kitkat', or 'apple'
     const inventory = [null, null, null];
@@ -632,6 +633,11 @@
     let appleCount = 1;
     let draggingItemSlider = -1;
 
+    // ============ LOCKERS ============
+    let lockersEnabled = true;
+    let lockerCount = 1;
+    let draggingLockerSlider = false;
+
     const PLAYER_RED_GLOW_RADIUS = 10 * T;
 
     // ============ REPATH TIMER ============
@@ -749,6 +755,7 @@
       lockers.length = 0;
       playerInLocker = false;
       lockerTimer = 0;
+      activeLockerIndex = -1;
 
       const startCell = pxToCell(startTX * T, startTY * T);
       const exitCell = pxToCell(exitX, exitY);
@@ -760,29 +767,19 @@
 
       shuffleInPlace(deadEnds);
 
-      // Place Oreos
+      // Place Oreos — ALWAYS in dead ends (there are always 3 dead ends)
       const numOreos = itemsEnabled ? oreoCount : 0;
       const oreoPlacements = deadEnds.slice(0, numOreos);
-
-      if (oreoPlacements.length < numOreos) {
-        const usedCells = new Set(oreoPlacements.map(([r, c]) => cellKey(r, c)));
-        usedCells.add(cellKey(startCell.r, startCell.c));
-        usedCells.add(cellKey(exitCell.r, exitCell.c));
-
-        const candidates = [];
-        for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++)
-          if (!usedCells.has(cellKey(r, c))) candidates.push([r, c]);
-
-        shuffleInPlace(candidates);
-        while (oreoPlacements.length < numOreos && candidates.length > 0) oreoPlacements.push(candidates.pop());
-      }
 
       for (const [r, c] of oreoPlacements) {
         const center = cellCenterPx(r, c);
         oreos.push({ x: center.x, y: center.y, collected: false, r, c });
       }
 
-      // Place KitKats
+      // Track which dead ends have oreos
+      const oreoDeadEndKeys = new Set(oreoPlacements.map(([r, c]) => cellKey(r, c)));
+
+      // Place KitKats — NOT in dead ends
       const numKitkats = itemsEnabled ? kitkatCount : 0;
       const deadEndSet = new Set(findDeadEnds().map(([r, c]) => cellKey(r, c)));
       const blocked = new Set();
@@ -809,7 +806,7 @@
         blocked.add(cellKey(kr, kc));
       }
 
-      // Place Apples
+      // Place Apples — NOT in dead ends
       const numApples = itemsEnabled ? appleCount : 0;
       const appleCandidates = [];
       for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
@@ -830,10 +827,9 @@
         blocked.add(cellKey(ar, ac));
       }
 
-      // Place 1 Locker in a dead end (preferring one without oreos)
+      // Locker helper — returns wall spots for a cell, picking only ONE spot
       function getLockerSpotsForCell(r, c) {
         const validSpots = [];
-        // Horizontal wall above cell (hSegWall[r][c]) — wall spans x: vLines[c]+WALL_W to vLines[c+1], y: hLines[r], size CORR_W x WALL_W
         if (r > 0 && hSegWall[r][c] === 1) {
           const wx = vLines[c] + WALL_W;
           const wy = hLines[r];
@@ -842,7 +838,6 @@
           const lx = wx + Math.floor((wallW - lw) / 2);
           validSpots.push({ x: lx * T, y: wy * T, w: lw * T, h: WALL_W * T, used: false });
         }
-        // Horizontal wall below cell (hSegWall[r+1][c])
         if (r < rows - 1 && hSegWall[r + 1][c] === 1) {
           const wx = vLines[c] + WALL_W;
           const wy = hLines[r + 1];
@@ -851,7 +846,6 @@
           const lx = wx + Math.floor((wallW - lw) / 2);
           validSpots.push({ x: lx * T, y: wy * T, w: lw * T, h: WALL_W * T, used: false });
         }
-        // Vertical wall left of cell (vSegWall[r][c])
         if (c > 0 && vSegWall[r][c] === 1) {
           const wx = vLines[c];
           const wy = hLines[r] + WALL_W;
@@ -860,49 +854,64 @@
           const ly = wy + Math.floor((wallH - lh) / 2);
           validSpots.push({ x: wx * T, y: ly * T, w: WALL_W * T, h: lh * T, used: false });
         }
-        // Vertical wall right of cell (vSegWall[r][c+1])
         if (c < cols - 1 && vSegWall[r][c + 1] === 1) {
           const wx = vLines[c + 1];
           const wy = hLines[r] + WALL_W;
           const wallH = (r + 1 < hLines.length ? hLines[r + 1] : MAP - B) - wy;
           const lh = Math.min(5, wallH);
           const ly = wy + Math.floor((wallH - lh) / 2);
-          validSpots.push({ x: wx * T, y: ly * T, w: WALL_W * T, h: lh * T, used: false });
+        validSpots.push({ x: wx * T, y: ly * T, w: WALL_W * T, h: lh * T, used: false });
         }
-        // Filter out top-left quadrant
-        return validSpots.filter(spot => {
-          const tx = spot.x / T + (spot.w / T) / 2;
-          const ty = spot.y / T + (spot.h / T) / 2;
-          return !(tx < MAP / 2 && ty < MAP / 2);
-        });
+        return validSpots;
       }
 
-      let lockerSpot = null;
-      // First: try dead ends without oreos (index 2+)
-      for (let i = 2; i < deadEnds.length; i++) {
-        const spots = getLockerSpotsForCell(deadEnds[i][0], deadEnds[i][1]);
-        if (spots.length > 0) { lockerSpot = spots[rngInt(spots.length)]; break; }
-      }
-      // Fallback: try dead ends with oreos (index 0-1)
-      if (!lockerSpot) {
-        for (let i = 0; i < Math.min(2, deadEnds.length); i++) {
-          const spots = getLockerSpotsForCell(deadEnds[i][0], deadEnds[i][1]);
-          if (spots.length > 0) { lockerSpot = spots[rngInt(spots.length)]; break; }
+      // Place Lockers — one per dead end, priority: empty dead ends → oreo dead ends → any wall
+      const numLockers = lockersEnabled ? lockerCount : 0;
+      const usedLockerCells = new Set();
+
+      // Phase 1: empty dead ends (not occupied by oreos)
+      for (const [r, c] of deadEnds) {
+        if (lockers.length >= numLockers) break;
+        const ck = cellKey(r, c);
+        if (oreoDeadEndKeys.has(ck)) continue;
+        if (usedLockerCells.has(ck)) continue;
+        const spots = getLockerSpotsForCell(r, c);
+        if (spots.length > 0) {
+          lockers.push(spots[rngInt(spots.length)]);
+          usedLockerCells.add(ck);
         }
       }
-      // Last resort: try any non-border cell with a closed wall
-      if (!lockerSpot) {
-        const cellCandidates = [];
+
+      // Phase 2: dead ends that have oreos
+      for (const [r, c] of deadEnds) {
+        if (lockers.length >= numLockers) break;
+        const ck = cellKey(r, c);
+        if (!oreoDeadEndKeys.has(ck)) continue;
+        if (usedLockerCells.has(ck)) continue;
+        const spots = getLockerSpotsForCell(r, c);
+        if (spots.length > 0) {
+          lockers.push(spots[rngInt(spots.length)]);
+          usedLockerCells.add(ck);
+        }
+      }
+
+      // Phase 3: any non-border cell with a wall (last resort, only if dead ends exhausted)
+      if (lockers.length < numLockers) {
+        const fallbackCells = [];
         for (let r = 1; r < rows - 1; r++) for (let c = 1; c < cols - 1; c++) {
+          const ck = cellKey(r, c);
+          if (usedLockerCells.has(ck)) continue;
+          if (deadEndSet.has(ck)) continue; // already tried all dead ends above
           const spots = getLockerSpotsForCell(r, c);
-          if (spots.length > 0) cellCandidates.push(spots);
+          if (spots.length > 0) fallbackCells.push({ r, c, spots });
         }
-        if (cellCandidates.length > 0) {
-          const pick = cellCandidates[rngInt(cellCandidates.length)];
-          lockerSpot = pick[rngInt(pick.length)];
+        shuffleInPlace(fallbackCells);
+        for (const fb of fallbackCells) {
+          if (lockers.length >= numLockers) break;
+          lockers.push(fb.spots[rngInt(fb.spots.length)]);
+          usedLockerCells.add(cellKey(fb.r, fb.c));
         }
       }
-      if (lockerSpot) lockers.push(lockerSpot);
 
       if (autoStart) {
         beginGameplay();
@@ -941,6 +950,11 @@
           if (draggingItemSlider === 0) oreoCount = count;
           else if (draggingItemSlider === 1) kitkatCount = count;
           else if (draggingItemSlider === 2) appleCount = count;
+        } else if (draggingLockerSlider && lockersEnabled && layout.lockerSlider) {
+          const sr = layout.lockerSlider;
+          let val = (mouseX - sr.x) / sr.w;
+          val = Math.max(0, Math.min(1, val));
+          lockerCount = Math.round(val * 3);
         }
       }
     });
@@ -973,12 +987,23 @@
             }
           }
         }
+        if (lockersEnabled && layout.lockerSlider) {
+          const sr = layout.lockerSlider;
+          if (mouseX >= sr.x - 10 && mouseX <= sr.x + sr.w + 10 && mouseY >= sr.y - 10 && mouseY <= sr.y + sr.h + 10) {
+            draggingLockerSlider = true;
+            let val = (mouseX - sr.x) / sr.w;
+            val = Math.max(0, Math.min(1, val));
+            lockerCount = Math.round(val * 3);
+            return;
+          }
+        }
       }
     });
 
     canvas.addEventListener('mouseup', () => { 
       isDraggingSlider = false; 
       draggingItemSlider = -1; 
+      draggingLockerSlider = false;
     });
 
     function getButtonRects() {
@@ -1069,7 +1094,21 @@
     // ============ SETTINGS SCREEN ============
     function getSettingsLayout() {
       const W = canvas.width, H = canvas.height;
-      let y = H / 2 - 170;
+      let totalH = 0;
+      
+      totalH += 35 + 40;
+      if (darknessEnabled) totalH += 60;
+      
+      totalH += 50 + 35;
+      if (itemsEnabled) totalH += 70;
+      
+      totalH += 50 + 35;
+      if (lockersEnabled) totalH += 70;
+      
+      totalH += 50 + 50;
+
+      let y = H / 2 - totalH / 2;
+      const titleY = y - 60;
       
       const darknessLabelY = y;
       y += 35;
@@ -1105,11 +1144,28 @@
       }
       
       y += 50;
+      const lockersLabelY = y;
+      y += 35;
+      const lockersToggle = { x: W / 2 - 30, y: y, w: 60, h: 30 };
+      
+      let lockerSlider = null;
+      let lockerSliderTextY = null;
+      if (lockersEnabled) {
+        y += 40;
+        lockerSlider = { x: W / 2 - 50, y: y, w: 100, h: 10 };
+        y += 30;
+        lockerSliderTextY = y;
+      }
+      
+      y += 50;
       const startBtn = { x: W / 2 - 140, y: y, w: 280, h: 50 };
       
       return { 
+        titleY,
         darknessLabelY, darknessToggle, darknessDescY, darknessSlider, darknessSliderTextY,
-        itemsLabelY, itemsToggle, itemSliders, itemSlidersTextY, startBtn
+        itemsLabelY, itemsToggle, itemSliders, itemSlidersTextY, 
+        lockersLabelY, lockersToggle, lockerSlider, lockerSliderTextY,
+        startBtn
       };
     }
 
@@ -1121,11 +1177,11 @@
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
+      const layout = getSettingsLayout();
+
       ctx.fillStyle = '#f0e6d3';
       ctx.font = 'bold 36px Arial';
-      ctx.fillText('Game Settings', W / 2, H / 2 - 220);
-
-      const layout = getSettingsLayout();
+      ctx.fillText('Game Settings', W / 2, layout.titleY);
 
       // Darkness toggle label
       ctx.fillStyle = '#fff';
@@ -1223,6 +1279,49 @@
         }
       }
 
+      // Lockers toggle label
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 22px Arial';
+      ctx.fillText('Lockers', W / 2, layout.lockersLabelY);
+
+      // Lockers Toggle track
+      const ltog = layout.lockersToggle;
+      ctx.fillStyle = lockersEnabled ? '#4caf50' : '#555';
+      const ltogR = ltog.h / 2;
+      ctx.beginPath();
+      ctx.arc(ltog.x + ltogR, ltog.y + ltogR, ltogR, Math.PI * 0.5, Math.PI * 1.5);
+      ctx.arc(ltog.x + ltog.w - ltogR, ltog.y + ltogR, ltogR, Math.PI * 1.5, Math.PI * 0.5);
+      ctx.closePath();
+      ctx.fill();
+
+      // Lockers Toggle knob
+      ctx.fillStyle = '#fff';
+      const lknobX = lockersEnabled ? ltog.x + ltog.w - ltogR : ltog.x + ltogR;
+      ctx.beginPath();
+      ctx.arc(lknobX, ltog.y + ltogR, ltogR - 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (lockersEnabled && layout.lockerSlider) {
+        const slr = layout.lockerSlider;
+        ctx.fillStyle = '#333';
+        ctx.fillRect(slr.x, slr.y, slr.w, slr.h);
+        
+        const fillPct = lockerCount / 3;
+        const fillW = fillPct * slr.w;
+        ctx.fillStyle = '#4caf50';
+        ctx.fillRect(slr.x, slr.y, fillW, slr.h);
+
+        const knobX = slr.x + fillW;
+        ctx.beginPath();
+        ctx.arc(knobX, slr.y + slr.h / 2, 8, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+
+        ctx.fillStyle = '#aaa';
+        ctx.font = '14px Arial';
+        ctx.fillText(`Lockers: ${lockerCount}`, slr.x + slr.w / 2, layout.lockerSliderTextY);
+      }
+
       // Start button
       const sr = layout.startBtn;
       const isHovered = mouseX >= sr.x && mouseX <= sr.x + sr.w && mouseY >= sr.y && mouseY <= sr.y + sr.h;
@@ -1262,6 +1361,9 @@
         }
         if (mouseX >= layout.itemsToggle.x && mouseX <= layout.itemsToggle.x + layout.itemsToggle.w && mouseY >= layout.itemsToggle.y && mouseY <= layout.itemsToggle.y + layout.itemsToggle.h) {
           itemsEnabled = !itemsEnabled;
+        }
+        if (mouseX >= layout.lockersToggle.x && mouseX <= layout.lockersToggle.x + layout.lockersToggle.w && mouseY >= layout.lockersToggle.y && mouseY <= layout.lockersToggle.y + layout.lockersToggle.h) {
+          lockersEnabled = !lockersEnabled;
         }
         const sr = layout.startBtn;
         if (mouseX >= sr.x && mouseX <= sr.x + sr.w && mouseY >= sr.y && mouseY <= sr.y + sr.h) {
@@ -1315,14 +1417,17 @@
           if (playerInLocker) {
             playerInLocker = false;
             lockerTimer = 0;
+            activeLockerIndex = -1;
             recalcEnemyPath();
           } else {
-            for (const locker of lockers) {
+            for (let li = 0; li < lockers.length; li++) {
+              const locker = lockers[li];
               if (locker.used) continue;
               if (player.x + PW / 2 > locker.x - 2 * T && player.x - PW / 2 < locker.x + locker.w + 2 * T &&
                 player.y + PH / 2 > locker.y - 2 * T && player.y - PH / 2 < locker.y + locker.h + 2 * T) {
                 playerInLocker = true;
                 lockerTimer = 5;
+                activeLockerIndex = li;
                 locker.used = true;
                 recalcEnemyPath();
                 break;
@@ -1559,6 +1664,7 @@
         if (lockerTimer <= 0) {
           playerInLocker = false;
           lockerTimer = 0;
+          activeLockerIndex = -1;
           recalcEnemyPath();
         }
       }
@@ -1857,11 +1963,12 @@
       if (enemy.active) drawEnemy(enemy.x - camX, enemy.y - camY);
 
       // Lockers
-      for (const locker of lockers) {
+      for (let li = 0; li < lockers.length; li++) {
+        const locker = lockers[li];
         if (!locker.used) {
           ctx.fillStyle = '#87CEEB';
           ctx.fillRect(locker.x - camX, locker.y - camY, locker.w, locker.h);
-        } else if (playerInLocker) {
+        } else if (playerInLocker && li === activeLockerIndex) {
           ctx.fillStyle = '#fff';
           ctx.font = 'bold 20px Arial';
           ctx.textAlign = 'center';
