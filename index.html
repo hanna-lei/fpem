@@ -624,6 +624,14 @@
     let darknessEnabled = false;
     let darknessRadiusTiles = 15;
     let isDraggingSlider = false;
+
+    // ============ ITEMS ============
+    let itemsEnabled = true;
+    let oreoCount = 2;
+    let kitkatCount = 1;
+    let appleCount = 1;
+    let draggingItemSlider = -1;
+
     const PLAYER_RED_GLOW_RADIUS = 10 * T;
 
     // ============ REPATH TIMER ============
@@ -742,7 +750,6 @@
       playerInLocker = false;
       lockerTimer = 0;
 
-      // Place 2 oreos — prefer dead ends, fall back to random cells
       const startCell = pxToCell(startTX * T, startTY * T);
       const exitCell = pxToCell(exitX, exitY);
 
@@ -752,9 +759,12 @@
       );
 
       shuffleInPlace(deadEnds);
-      const oreoPlacements = deadEnds.slice(0, 2);
 
-      if (oreoPlacements.length < 2) {
+      // Place Oreos
+      const numOreos = itemsEnabled ? oreoCount : 0;
+      const oreoPlacements = deadEnds.slice(0, numOreos);
+
+      if (oreoPlacements.length < numOreos) {
         const usedCells = new Set(oreoPlacements.map(([r, c]) => cellKey(r, c)));
         usedCells.add(cellKey(startCell.r, startCell.c));
         usedCells.add(cellKey(exitCell.r, exitCell.c));
@@ -764,7 +774,7 @@
           if (!usedCells.has(cellKey(r, c))) candidates.push([r, c]);
 
         shuffleInPlace(candidates);
-        while (oreoPlacements.length < 2 && candidates.length > 0) oreoPlacements.push(candidates.pop());
+        while (oreoPlacements.length < numOreos && candidates.length > 0) oreoPlacements.push(candidates.pop());
       }
 
       for (const [r, c] of oreoPlacements) {
@@ -772,7 +782,8 @@
         oreos.push({ x: center.x, y: center.y, collected: false, r, c });
       }
 
-      // Place 1 KitKat — random, NOT a dead end, not on start/exit/oreo
+      // Place KitKats
+      const numKitkats = itemsEnabled ? kitkatCount : 0;
       const deadEndSet = new Set(findDeadEnds().map(([r, c]) => cellKey(r, c)));
       const blocked = new Set();
       blocked.add(cellKey(startCell.r, startCell.c));
@@ -782,55 +793,41 @@
       const kitkatCandidates = [];
       for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
         const k = cellKey(r, c);
-        if (blocked.has(k)) continue;
-        if (deadEndSet.has(k)) continue;
-
-        // Prevent spawning in a 3x3 cell area around start and exit
+        if (blocked.has(k) || deadEndSet.has(k)) continue;
         if (Math.abs(r - startCell.r) <= 1 && Math.abs(c - startCell.c) <= 1) continue;
         if (Math.abs(r - exitCell.r) <= 1 && Math.abs(c - exitCell.c) <= 1) continue;
-
-        // Also prevent spawning in any of the 4 corner cells (potential start/exit zones)
         if ((r === 0 && c === 0) || (r === 0 && c === cols - 1) ||
-          (r === rows - 1 && c === 0) || (r === rows - 1 && c === cols - 1)) {
-          continue;
-        }
-
+          (r === rows - 1 && c === 0) || (r === rows - 1 && c === cols - 1)) continue;
         kitkatCandidates.push([r, c]);
       }
       shuffleInPlace(kitkatCandidates);
 
-      if (kitkatCandidates.length > 0) {
-        const [kr, kc] = kitkatCandidates[0];
+      while (kitkats.length < numKitkats && kitkatCandidates.length > 0) {
+        const [kr, kc] = kitkatCandidates.pop();
         const center = cellCenterPx(kr, kc);
         kitkats.push({ x: center.x, y: center.y, collected: false, r: kr, c: kc });
         blocked.add(cellKey(kr, kc));
       }
 
-      // Place 1 Apple — random, NOT a dead end, not on start/exit/oreo/kitkat/corners
+      // Place Apples
+      const numApples = itemsEnabled ? appleCount : 0;
       const appleCandidates = [];
       for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
         const k = cellKey(r, c);
-        if (blocked.has(k)) continue;
-        if (deadEndSet.has(k)) continue;
-
-        // Prevent spawning in a 3x3 cell area around start and exit
+        if (blocked.has(k) || deadEndSet.has(k)) continue;
         if (Math.abs(r - startCell.r) <= 1 && Math.abs(c - startCell.c) <= 1) continue;
         if (Math.abs(r - exitCell.r) <= 1 && Math.abs(c - exitCell.c) <= 1) continue;
-
-        // Also prevent spawning in any of the 4 corner cells
         if ((r === 0 && c === 0) || (r === 0 && c === cols - 1) ||
-          (r === rows - 1 && c === 0) || (r === rows - 1 && c === cols - 1)) {
-          continue;
-        }
-
+          (r === rows - 1 && c === 0) || (r === rows - 1 && c === cols - 1)) continue;
         appleCandidates.push([r, c]);
       }
       shuffleInPlace(appleCandidates);
 
-      if (appleCandidates.length > 0) {
-        const [ar, ac] = appleCandidates[0];
+      while (apples.length < numApples && appleCandidates.length > 0) {
+        const [ar, ac] = appleCandidates.pop();
         const center = cellCenterPx(ar, ac);
         apples.push({ x: center.x, y: center.y, collected: false, r: ar, c: ac });
+        blocked.add(cellKey(ar, ac));
       }
 
       // Place 1 Locker in a dead end (preferring one without oreos)
@@ -930,27 +927,59 @@
       mouseX = e.clientX;
       mouseY = e.clientY;
 
-      if (isDraggingSlider && gameState === 'settings' && darknessEnabled) {
-        const sr = getSettingsSliderRect();
-        let val = (mouseX - sr.x) / sr.w;
-        val = Math.max(0, Math.min(1, val));
-        darknessRadiusTiles = 15 + Math.round(val * 10);
-      }
-    });
-
-    canvas.addEventListener('mousedown', e => {
-      if (gameState === 'settings' && darknessEnabled) {
-        const sr = getSettingsSliderRect();
-        if (mouseX >= sr.x - 10 && mouseX <= sr.x + sr.w + 10 && mouseY >= sr.y - 10 && mouseY <= sr.y + sr.h + 10) {
-          isDraggingSlider = true;
-          let val = (mouseX - sr.x) / sr.w;
+      if (gameState === 'settings') {
+        const layout = getSettingsLayout();
+        if (isDraggingSlider && darknessEnabled && layout.darknessSlider) {
+          let val = (mouseX - layout.darknessSlider.x) / layout.darknessSlider.w;
           val = Math.max(0, Math.min(1, val));
           darknessRadiusTiles = 15 + Math.round(val * 10);
+        } else if (draggingItemSlider !== -1 && itemsEnabled && layout.itemSliders) {
+          const sr = layout.itemSliders[draggingItemSlider];
+          let val = (mouseX - sr.x) / sr.w;
+          val = Math.max(0, Math.min(1, val));
+          const count = Math.round(val * 3);
+          if (draggingItemSlider === 0) oreoCount = count;
+          else if (draggingItemSlider === 1) kitkatCount = count;
+          else if (draggingItemSlider === 2) appleCount = count;
         }
       }
     });
 
-    canvas.addEventListener('mouseup', () => { isDraggingSlider = false; });
+    canvas.addEventListener('mousedown', e => {
+      if (gameState === 'settings') {
+        const layout = getSettingsLayout();
+        if (darknessEnabled && layout.darknessSlider) {
+          const sr = layout.darknessSlider;
+          if (mouseX >= sr.x - 10 && mouseX <= sr.x + sr.w + 10 && mouseY >= sr.y - 10 && mouseY <= sr.y + sr.h + 10) {
+            isDraggingSlider = true;
+            let val = (mouseX - sr.x) / sr.w;
+            val = Math.max(0, Math.min(1, val));
+            darknessRadiusTiles = 15 + Math.round(val * 10);
+            return;
+          }
+        }
+        if (itemsEnabled && layout.itemSliders) {
+          for (let i = 0; i < 3; i++) {
+            const sr = layout.itemSliders[i];
+            if (mouseX >= sr.x - 10 && mouseX <= sr.x + sr.w + 10 && mouseY >= sr.y - 10 && mouseY <= sr.y + sr.h + 10) {
+              draggingItemSlider = i;
+              let val = (mouseX - sr.x) / sr.w;
+              val = Math.max(0, Math.min(1, val));
+              const count = Math.round(val * 3);
+              if (i === 0) oreoCount = count;
+              else if (i === 1) kitkatCount = count;
+              else if (i === 2) appleCount = count;
+              return;
+            }
+          }
+        }
+      }
+    });
+
+    canvas.addEventListener('mouseup', () => { 
+      isDraggingSlider = false; 
+      draggingItemSlider = -1; 
+    });
 
     function getButtonRects() {
       const W = canvas.width, H = canvas.height;
@@ -1038,22 +1067,50 @@
     }
 
     // ============ SETTINGS SCREEN ============
-    function getSettingsToggleRect() {
+    function getSettingsLayout() {
       const W = canvas.width, H = canvas.height;
-      const tw = 60, th = 30;
-      return { x: W / 2 - tw / 2, y: H / 2 - 80, w: tw, h: th };
-    }
-
-    function getSettingsSliderRect() {
-      const W = canvas.width, H = canvas.height;
-      const w = 200, h = 10;
-      return { x: W / 2 - w / 2, y: H / 2 - 10, w, h };
-    }
-
-    function getSettingsStartRect() {
-      const W = canvas.width, H = canvas.height;
-      const btnW = 280, btnH = 50;
-      return { x: W / 2 - btnW / 2, y: H / 2 + 50, w: btnW, h: btnH };
+      let y = H / 2 - 170;
+      
+      const darknessLabelY = y;
+      y += 35;
+      const darknessToggle = { x: W / 2 - 30, y: y, w: 60, h: 30 };
+      y += 40;
+      const darknessDescY = y;
+      
+      let darknessSlider = null;
+      let darknessSliderTextY = null;
+      if (darknessEnabled) {
+        y += 30;
+        darknessSlider = { x: W / 2 - 100, y: y, w: 200, h: 10 };
+        y += 30;
+        darknessSliderTextY = y;
+      }
+      
+      y += 50;
+      const itemsLabelY = y;
+      y += 35;
+      const itemsToggle = { x: W / 2 - 30, y: y, w: 60, h: 30 };
+      
+      let itemSliders = null;
+      let itemSlidersTextY = null;
+      if (itemsEnabled) {
+        y += 40;
+        itemSliders = [
+          { x: W / 2 - 170, y: y, w: 100, h: 10 },
+          { x: W / 2 - 50,  y: y, w: 100, h: 10 },
+          { x: W / 2 + 70,  y: y, w: 100, h: 10 }
+        ];
+        y += 30;
+        itemSlidersTextY = y;
+      }
+      
+      y += 50;
+      const startBtn = { x: W / 2 - 140, y: y, w: 280, h: 50 };
+      
+      return { 
+        darknessLabelY, darknessToggle, darknessDescY, darknessSlider, darknessSliderTextY,
+        itemsLabelY, itemsToggle, itemSliders, itemSlidersTextY, startBtn
+      };
     }
 
     function renderSettings() {
@@ -1066,42 +1123,43 @@
 
       ctx.fillStyle = '#f0e6d3';
       ctx.font = 'bold 36px Arial';
-      ctx.fillText('Game Settings', W / 2, H / 2 - 150);
+      ctx.fillText('Game Settings', W / 2, H / 2 - 220);
+
+      const layout = getSettingsLayout();
 
       // Darkness toggle label
       ctx.fillStyle = '#fff';
       ctx.font = 'bold 22px Arial';
-      ctx.fillText('Darkness', W / 2, H / 2 - 115);
+      ctx.fillText('Darkness', W / 2, layout.darknessLabelY);
 
-      // Toggle track
-      const tog = getSettingsToggleRect();
+      // Darkness Toggle track
+      const dtog = layout.darknessToggle;
       ctx.fillStyle = darknessEnabled ? '#4caf50' : '#555';
-      const togR = tog.h / 2;
+      const dtogR = dtog.h / 2;
       ctx.beginPath();
-      ctx.arc(tog.x + togR, tog.y + togR, togR, Math.PI * 0.5, Math.PI * 1.5);
-      ctx.arc(tog.x + tog.w - togR, tog.y + togR, togR, Math.PI * 1.5, Math.PI * 0.5);
+      ctx.arc(dtog.x + dtogR, dtog.y + dtogR, dtogR, Math.PI * 0.5, Math.PI * 1.5);
+      ctx.arc(dtog.x + dtog.w - dtogR, dtog.y + dtogR, dtogR, Math.PI * 1.5, Math.PI * 0.5);
       ctx.closePath();
       ctx.fill();
 
-      // Toggle knob
+      // Darkness Toggle knob
       ctx.fillStyle = '#fff';
-      const knobX = darknessEnabled ? tog.x + tog.w - togR : tog.x + togR;
+      const dknobX = darknessEnabled ? dtog.x + dtog.w - dtogR : dtog.x + dtogR;
       ctx.beginPath();
-      ctx.arc(knobX, tog.y + togR, togR - 3, 0, Math.PI * 2);
+      ctx.arc(dknobX, dtog.y + dtogR, dtogR - 3, 0, Math.PI * 2);
       ctx.fill();
 
-      // Description
+      // Darkness Description
       ctx.fillStyle = '#aaa';
       ctx.font = '16px Arial';
-      ctx.fillText(darknessEnabled ? 'The maze will be shrouded in darkness.' : 'Normal visibility.', W / 2, H / 2 - 40);
+      ctx.fillText(darknessEnabled ? 'The maze will be shrouded in darkness.' : 'Normal visibility.', W / 2, layout.darknessDescY);
 
-      // Slider
-      if (darknessEnabled) {
-        const slr = getSettingsSliderRect();
-
+      // Darkness Slider
+      if (darknessEnabled && layout.darknessSlider) {
+        const slr = layout.darknessSlider;
         ctx.fillStyle = '#333';
         ctx.fillRect(slr.x, slr.y, slr.w, slr.h);
-
+        
         const fillPct = (darknessRadiusTiles - 15) / 10;
         const fillW = fillPct * slr.w;
         ctx.fillStyle = '#4caf50';
@@ -1115,11 +1173,58 @@
 
         ctx.fillStyle = '#aaa';
         ctx.font = '14px Arial';
-        ctx.fillText(`Light amount: ${darknessRadiusTiles} tiles`, W / 2, slr.y + 25);
+        ctx.fillText(`Light amount: ${darknessRadiusTiles} tiles`, W / 2, layout.darknessSliderTextY);
+      }
+
+      // Items toggle label
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 22px Arial';
+      ctx.fillText('Items', W / 2, layout.itemsLabelY);
+
+      // Items Toggle track
+      const itog = layout.itemsToggle;
+      ctx.fillStyle = itemsEnabled ? '#4caf50' : '#555';
+      const itogR = itog.h / 2;
+      ctx.beginPath();
+      ctx.arc(itog.x + itogR, itog.y + itogR, itogR, Math.PI * 0.5, Math.PI * 1.5);
+      ctx.arc(itog.x + itog.w - itogR, itog.y + itogR, itogR, Math.PI * 1.5, Math.PI * 0.5);
+      ctx.closePath();
+      ctx.fill();
+
+      // Items Toggle knob
+      ctx.fillStyle = '#fff';
+      const iknobX = itemsEnabled ? itog.x + itog.w - itogR : itog.x + itogR;
+      ctx.beginPath();
+      ctx.arc(iknobX, itog.y + itogR, itogR - 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (itemsEnabled && layout.itemSliders) {
+        const counts = [oreoCount, kitkatCount, appleCount];
+        const labels = ['Oreos', 'KitKats', 'Apples'];
+        for (let i = 0; i < 3; i++) {
+          const slr = layout.itemSliders[i];
+          ctx.fillStyle = '#333';
+          ctx.fillRect(slr.x, slr.y, slr.w, slr.h);
+          
+          const fillPct = counts[i] / 3;
+          const fillW = fillPct * slr.w;
+          ctx.fillStyle = '#4caf50';
+          ctx.fillRect(slr.x, slr.y, fillW, slr.h);
+
+          const knobX = slr.x + fillW;
+          ctx.beginPath();
+          ctx.arc(knobX, slr.y + slr.h / 2, 8, 0, Math.PI * 2);
+          ctx.fillStyle = '#fff';
+          ctx.fill();
+
+          ctx.fillStyle = '#aaa';
+          ctx.font = '14px Arial';
+          ctx.fillText(`${labels[i]}: ${counts[i]}`, slr.x + slr.w / 2, layout.itemSlidersTextY);
+        }
       }
 
       // Start button
-      const sr = getSettingsStartRect();
+      const sr = layout.startBtn;
       const isHovered = mouseX >= sr.x && mouseX <= sr.x + sr.w && mouseY >= sr.y && mouseY <= sr.y + sr.h;
       ctx.fillStyle = isHovered ? '#5a5a7e' : '#3a3a5e';
       ctx.strokeStyle = isHovered ? '#888' : '#666';
@@ -1146,15 +1251,19 @@
         const btn = getHoveredButton();
         if (btn && btn.active) {
           if (btn.label === 'Randomize') {
-            startGame({ autoStart: false });
+            settingsStartLaunchesNewRound = true;
+            gameState = 'settings';
           }
         }
       } else if (gameState === 'settings') {
-        const tog = getSettingsToggleRect();
-        if (mouseX >= tog.x && mouseX <= tog.x + tog.w && mouseY >= tog.y && mouseY <= tog.y + tog.h) {
+        const layout = getSettingsLayout();
+        if (mouseX >= layout.darknessToggle.x && mouseX <= layout.darknessToggle.x + layout.darknessToggle.w && mouseY >= layout.darknessToggle.y && mouseY <= layout.darknessToggle.y + layout.darknessToggle.h) {
           darknessEnabled = !darknessEnabled;
         }
-        const sr = getSettingsStartRect();
+        if (mouseX >= layout.itemsToggle.x && mouseX <= layout.itemsToggle.x + layout.itemsToggle.w && mouseY >= layout.itemsToggle.y && mouseY <= layout.itemsToggle.y + layout.itemsToggle.h) {
+          itemsEnabled = !itemsEnabled;
+        }
+        const sr = layout.startBtn;
         if (mouseX >= sr.x && mouseX <= sr.x + sr.w && mouseY >= sr.y && mouseY <= sr.y + sr.h) {
           if (settingsStartLaunchesNewRound) startGame();
           else beginGameplay();
