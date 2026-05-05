@@ -676,6 +676,7 @@
     // ============ MAP SIZE ============
     let mapSize = 100;
     let draggingMapSlider = false;
+    let settingsScrollY = 0;
 
     const PLAYER_RED_GLOW_RADIUS = 10 * T;
 
@@ -1074,6 +1075,13 @@
       }
     });
 
+    canvas.addEventListener('wheel', e => {
+      if (gameState === 'settings') {
+        settingsScrollY -= e.deltaY;
+        e.preventDefault();
+      }
+    }, { passive: false });
+
     canvas.addEventListener('mouseup', () => {
       isDraggingSlider = false;
       draggingItemSlider = -1;
@@ -1184,7 +1192,10 @@
 
       totalH += 50 + 50;
 
-      let y = H / 2 - totalH / 2;
+      const maxScroll = Math.max(0, totalH - H + 200);
+      settingsScrollY = Math.max(-maxScroll, Math.min(maxScroll, settingsScrollY));
+
+      let y = H / 2 - totalH / 2 + settingsScrollY;
       const titleY = y - 60;
 
       const darknessLabelY = y;
