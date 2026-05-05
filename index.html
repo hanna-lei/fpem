@@ -663,7 +663,7 @@
 
     // ============ ITEMS ============
     let itemsEnabled = true;
-    let oreoCount = 2;
+    let oreoCount = 1;
     let kitkatCount = 1;
     let appleCount = 1;
     let draggingItemSlider = -1;
@@ -1007,10 +1007,11 @@
           mapSize = 100 + Math.round(val * 150);
           // Clamp item/locker counts to new max
           const newMax = getTargetDeadEnds(mapSize);
-          oreoCount = Math.min(oreoCount, newMax);
-          kitkatCount = Math.min(kitkatCount, newMax);
-          appleCount = Math.min(appleCount, newMax);
-          lockerCount = Math.min(lockerCount, newMax);
+          const half = Math.floor(newMax / 2);
+          oreoCount = half;
+          kitkatCount = half;
+          appleCount = half;
+          lockerCount = half;
         }
       }
     });
@@ -1062,10 +1063,11 @@
             val = Math.max(0, Math.min(1, val));
             mapSize = 100 + Math.round(val * 150);
             const newMax = getTargetDeadEnds(mapSize);
-            oreoCount = Math.min(oreoCount, newMax);
-            kitkatCount = Math.min(kitkatCount, newMax);
-            appleCount = Math.min(appleCount, newMax);
-            lockerCount = Math.min(lockerCount, newMax);
+            const half = Math.floor(newMax / 2);
+            oreoCount = half;
+            kitkatCount = half;
+            appleCount = half;
+            lockerCount = half;
             return;
           }
         }
