@@ -61,8 +61,9 @@
     });
 
     const T = 15;
-    const MAP = 100;
-    const MAP_PX = MAP * T;
+
+    let MAP = 100;
+    let MAP_PX = MAP * T;
 
     let seed;
     function rng() {
@@ -76,15 +77,47 @@
     const CORR_W = 10;
     const CELL = WALL_W + CORR_W;
 
-    const hLines = [];
-    const vLines = [];
-    for (let p = B; p + WALL_W <= MAP - B; p += CELL) {
-      hLines.push(p);
-      vLines.push(p);
+    let hLines = [];
+    let vLines = [];
+    let rows = 0;
+    let cols = 0;
+
+    function rebuildMapGrid(newSize) {
+      MAP = newSize;
+      MAP_PX = MAP * T;
+      
+      const minBorder = B;
+      const maxCols = Math.floor((MAP - 2 * minBorder - WALL_W) / CELL);
+      
+      const actualGridWidth = maxCols * CELL + WALL_W;
+      const extraSpace = (MAP - 2 * minBorder) - actualGridWidth;
+      
+      const baseExtra = Math.floor(extraSpace / maxCols);
+      const remainder = extraSpace % maxCols;
+
+      hLines = [];
+      vLines = [];
+      let p = minBorder;
+      for (let i = 0; i <= maxCols; i++) {
+        hLines.push(p);
+        vLines.push(p);
+        
+        let currentCellWidth = CELL + baseExtra + (i < remainder ? 1 : 0);
+        p += currentCellWidth;
+      }
+      
+      rows = hLines.length - 1;
+      cols = vLines.length - 1;
+      map = new Uint8Array(MAP * MAP);
     }
 
-    const rows = hLines.length - 1;
-    const cols = vLines.length - 1;
+    function getTargetDeadEnds(mapSz) {
+      const gridSize = Math.floor((mapSz - 2 * B - WALL_W) / CELL);
+      return Math.max(3, Math.round(3 * gridSize * gridSize / 49));
+    }
+
+    let map;
+    rebuildMapGrid(100);
 
     const DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
     let hSegWall, vSegWall;
@@ -114,7 +147,7 @@
       return de;
     }
 
-    const map = new Uint8Array(MAP * MAP);
+
     let startTX, startTY, exitTX, exitTY;
 
     function getCornerPos(name) {
@@ -328,7 +361,7 @@
       return [];
     }
 
-    function generateMaze(trySeed) {
+    function generateMaze(trySeed, targetDE) {
       seed = trySeed;
       hSegWall = Array.from({ length: hLines.length }, () => new Uint8Array(cols).fill(1));
       vSegWall = Array.from({ length: rows }, () => new Uint8Array(vLines.length).fill(1));
@@ -367,7 +400,7 @@
 
       for (let iter = 0; iter < 2000; iter++) {
         const de = findDeadEnds();
-        if (de.length <= 3) break;
+        if (de.length <= targetDE) break;
         const cands = de.filter(([r, c]) => !(r === 0 && c === 0));
         if (cands.length === 0) break;
         const [dr, dc] = cands[rngInt(cands.length)];
@@ -549,6 +582,8 @@
     const mctx = mazeCanvas.getContext('2d');
 
     function preRenderMaze() {
+      mazeCanvas.width = MAP_PX;
+      mazeCanvas.height = MAP_PX;
       mctx.clearRect(0, 0, MAP_PX, MAP_PX);
 
       mctx.fillStyle = '#2d2d4e';
@@ -638,6 +673,10 @@
     let lockerCount = 1;
     let draggingLockerSlider = false;
 
+    // ============ MAP SIZE ============
+    let mapSize = 100;
+    let draggingMapSlider = false;
+
     const PLAYER_RED_GLOW_RADIUS = 10 * T;
 
     // ============ REPATH TIMER ============
@@ -667,6 +706,10 @@
     function startGame(options = {}) {
       const { autoStart = true } = options;
       settingsStartLaunchesNewRound = false;
+
+      rebuildMapGrid(mapSize);
+      const targetDE = getTargetDeadEnds(mapSize);
+
       const masterSeed = Date.now();
       exitCorner = chooseExitCorner(masterSeed);
       enemyVariant = chooseEnemyVariant(masterSeed);
@@ -680,7 +723,7 @@
       let chosenSeed = 0;
       for (let attempt = 0; attempt < 500; attempt++) {
         const trySeed = (Math.random() * 2147483647) | 0;
-        generateMaze(trySeed);
+        generateMaze(trySeed, targetDE);
 
         const nonExitCorners = getNonExitCorners();
         let allReachable = true;
@@ -691,7 +734,7 @@
             break;
           }
         }
-        if (allReachable && findDeadEnds().length === 3) {
+        if (allReachable && findDeadEnds().length === targetDE) {
           chosenSeed = trySeed;
           break;
         }
@@ -860,7 +903,7 @@
           const wallH = (r + 1 < hLines.length ? hLines[r + 1] : MAP - B) - wy;
           const lh = Math.min(5, wallH);
           const ly = wy + Math.floor((wallH - lh) / 2);
-        validSpots.push({ x: wx * T, y: ly * T, w: WALL_W * T, h: lh * T, used: false });
+          validSpots.push({ x: wx * T, y: ly * T, w: WALL_W * T, h: lh * T, used: false });
         }
         return validSpots;
       }
@@ -939,6 +982,7 @@
 
       if (gameState === 'settings') {
         const layout = getSettingsLayout();
+        const maxDE = getTargetDeadEnds(mapSize);
         if (isDraggingSlider && darknessEnabled && layout.darknessSlider) {
           let val = (mouseX - layout.darknessSlider.x) / layout.darknessSlider.w;
           val = Math.max(0, Math.min(1, val));
@@ -947,7 +991,7 @@
           const sr = layout.itemSliders[draggingItemSlider];
           let val = (mouseX - sr.x) / sr.w;
           val = Math.max(0, Math.min(1, val));
-          const count = Math.round(val * 3);
+          const count = Math.round(val * maxDE);
           if (draggingItemSlider === 0) oreoCount = count;
           else if (draggingItemSlider === 1) kitkatCount = count;
           else if (draggingItemSlider === 2) appleCount = count;
@@ -955,7 +999,18 @@
           const sr = layout.lockerSlider;
           let val = (mouseX - sr.x) / sr.w;
           val = Math.max(0, Math.min(1, val));
-          lockerCount = Math.round(val * 3);
+          lockerCount = Math.round(val * maxDE);
+        } else if (draggingMapSlider && layout.mapSlider) {
+          const sr = layout.mapSlider;
+          let val = (mouseX - sr.x) / sr.w;
+          val = Math.max(0, Math.min(1, val));
+          mapSize = 100 + Math.round(val * 150);
+          // Clamp item/locker counts to new max
+          const newMax = getTargetDeadEnds(mapSize);
+          oreoCount = Math.min(oreoCount, newMax);
+          kitkatCount = Math.min(kitkatCount, newMax);
+          appleCount = Math.min(appleCount, newMax);
+          lockerCount = Math.min(lockerCount, newMax);
         }
       }
     });
@@ -963,6 +1018,7 @@
     canvas.addEventListener('mousedown', e => {
       if (gameState === 'settings') {
         const layout = getSettingsLayout();
+        const maxDE = getTargetDeadEnds(mapSize);
         if (darknessEnabled && layout.darknessSlider) {
           const sr = layout.darknessSlider;
           if (mouseX >= sr.x - 10 && mouseX <= sr.x + sr.w + 10 && mouseY >= sr.y - 10 && mouseY <= sr.y + sr.h + 10) {
@@ -980,7 +1036,7 @@
               draggingItemSlider = i;
               let val = (mouseX - sr.x) / sr.w;
               val = Math.max(0, Math.min(1, val));
-              const count = Math.round(val * 3);
+              const count = Math.round(val * maxDE);
               if (i === 0) oreoCount = count;
               else if (i === 1) kitkatCount = count;
               else if (i === 2) appleCount = count;
@@ -994,17 +1050,33 @@
             draggingLockerSlider = true;
             let val = (mouseX - sr.x) / sr.w;
             val = Math.max(0, Math.min(1, val));
-            lockerCount = Math.round(val * 3);
+            lockerCount = Math.round(val * maxDE);
+            return;
+          }
+        }
+        if (layout.mapSlider) {
+          const sr = layout.mapSlider;
+          if (mouseX >= sr.x - 10 && mouseX <= sr.x + sr.w + 10 && mouseY >= sr.y - 10 && mouseY <= sr.y + sr.h + 10) {
+            draggingMapSlider = true;
+            let val = (mouseX - sr.x) / sr.w;
+            val = Math.max(0, Math.min(1, val));
+            mapSize = 100 + Math.round(val * 150);
+            const newMax = getTargetDeadEnds(mapSize);
+            oreoCount = Math.min(oreoCount, newMax);
+            kitkatCount = Math.min(kitkatCount, newMax);
+            appleCount = Math.min(appleCount, newMax);
+            lockerCount = Math.min(lockerCount, newMax);
             return;
           }
         }
       }
     });
 
-    canvas.addEventListener('mouseup', () => { 
-      isDraggingSlider = false; 
-      draggingItemSlider = -1; 
+    canvas.addEventListener('mouseup', () => {
+      isDraggingSlider = false;
+      draggingItemSlider = -1;
       draggingLockerSlider = false;
+      draggingMapSlider = false;
     });
 
     function getButtonRects() {
@@ -1096,27 +1168,29 @@
     function getSettingsLayout() {
       const W = canvas.width, H = canvas.height;
       let totalH = 0;
-      
+
       totalH += 35 + 40;
       if (darknessEnabled) totalH += 60;
-      
+
       totalH += 50 + 35;
       if (itemsEnabled) totalH += 70;
-      
+
       totalH += 50 + 35;
       if (lockersEnabled) totalH += 70;
-      
+
+      totalH += 50 + 35 + 60; // map size label + slider + text
+
       totalH += 50 + 50;
 
       let y = H / 2 - totalH / 2;
       const titleY = y - 60;
-      
+
       const darknessLabelY = y;
       y += 35;
       const darknessToggle = { x: W / 2 - 30, y: y, w: 60, h: 30 };
       y += 40;
       const darknessDescY = y;
-      
+
       let darknessSlider = null;
       let darknessSliderTextY = null;
       if (darknessEnabled) {
@@ -1125,30 +1199,30 @@
         y += 30;
         darknessSliderTextY = y;
       }
-      
+
       y += 50;
       const itemsLabelY = y;
       y += 35;
       const itemsToggle = { x: W / 2 - 30, y: y, w: 60, h: 30 };
-      
+
       let itemSliders = null;
       let itemSlidersTextY = null;
       if (itemsEnabled) {
         y += 40;
         itemSliders = [
           { x: W / 2 - 170, y: y, w: 100, h: 10 },
-          { x: W / 2 - 50,  y: y, w: 100, h: 10 },
-          { x: W / 2 + 70,  y: y, w: 100, h: 10 }
+          { x: W / 2 - 50, y: y, w: 100, h: 10 },
+          { x: W / 2 + 70, y: y, w: 100, h: 10 }
         ];
         y += 30;
         itemSlidersTextY = y;
       }
-      
+
       y += 50;
       const lockersLabelY = y;
       y += 35;
       const lockersToggle = { x: W / 2 - 30, y: y, w: 60, h: 30 };
-      
+
       let lockerSlider = null;
       let lockerSliderTextY = null;
       if (lockersEnabled) {
@@ -1157,15 +1231,23 @@
         y += 30;
         lockerSliderTextY = y;
       }
-      
+
+      y += 50;
+      const mapSizeLabelY = y;
+      y += 35;
+      const mapSlider = { x: W / 2 - 100, y: y, w: 200, h: 10 };
+      y += 25;
+      const mapSliderTextY = y;
+
       y += 50;
       const startBtn = { x: W / 2 - 140, y: y, w: 280, h: 50 };
-      
-      return { 
+
+      return {
         titleY,
         darknessLabelY, darknessToggle, darknessDescY, darknessSlider, darknessSliderTextY,
-        itemsLabelY, itemsToggle, itemSliders, itemSlidersTextY, 
+        itemsLabelY, itemsToggle, itemSliders, itemSlidersTextY,
         lockersLabelY, lockersToggle, lockerSlider, lockerSliderTextY,
+        mapSizeLabelY, mapSlider, mapSliderTextY,
         startBtn
       };
     }
@@ -1216,7 +1298,7 @@
         const slr = layout.darknessSlider;
         ctx.fillStyle = '#333';
         ctx.fillRect(slr.x, slr.y, slr.w, slr.h);
-        
+
         const fillPct = (darknessRadiusTiles - 15) / 10;
         const fillW = fillPct * slr.w;
         ctx.fillStyle = '#4caf50';
@@ -1256,14 +1338,15 @@
       ctx.fill();
 
       if (itemsEnabled && layout.itemSliders) {
+        const maxDE = getTargetDeadEnds(mapSize);
         const counts = [oreoCount, kitkatCount, appleCount];
         const labels = ['Oreos', 'KitKats', 'Apples'];
         for (let i = 0; i < 3; i++) {
           const slr = layout.itemSliders[i];
           ctx.fillStyle = '#333';
           ctx.fillRect(slr.x, slr.y, slr.w, slr.h);
-          
-          const fillPct = counts[i] / 3;
+
+          const fillPct = maxDE > 0 ? counts[i] / maxDE : 0;
           const fillW = fillPct * slr.w;
           ctx.fillStyle = '#4caf50';
           ctx.fillRect(slr.x, slr.y, fillW, slr.h);
@@ -1306,8 +1389,8 @@
         const slr = layout.lockerSlider;
         ctx.fillStyle = '#333';
         ctx.fillRect(slr.x, slr.y, slr.w, slr.h);
-        
-        const fillPct = lockerCount / 3;
+
+        const fillPct = getTargetDeadEnds(mapSize) > 0 ? lockerCount / getTargetDeadEnds(mapSize) : 0;
         const fillW = fillPct * slr.w;
         ctx.fillStyle = '#4caf50';
         ctx.fillRect(slr.x, slr.y, fillW, slr.h);
@@ -1322,6 +1405,31 @@
         ctx.font = '14px Arial';
         ctx.fillText(`Lockers: ${lockerCount}`, slr.x + slr.w / 2, layout.lockerSliderTextY);
       }
+
+      // Map Size
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 22px Arial';
+      ctx.fillText('Map Size', W / 2, layout.mapSizeLabelY);
+
+      const mslr = layout.mapSlider;
+      ctx.fillStyle = '#333';
+      ctx.fillRect(mslr.x, mslr.y, mslr.w, mslr.h);
+
+      const mapFillPct = (mapSize - 100) / 150;
+      const mapFillW = mapFillPct * mslr.w;
+      ctx.fillStyle = '#4caf50';
+      ctx.fillRect(mslr.x, mslr.y, mapFillW, mslr.h);
+
+      const mapKnobX = mslr.x + mapFillW;
+      ctx.beginPath();
+      ctx.arc(mapKnobX, mslr.y + mslr.h / 2, 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+
+      const gridSz = Math.floor((mapSize - 2 * B - WALL_W) / CELL);
+      ctx.fillStyle = '#aaa';
+      ctx.font = '14px Arial';
+      ctx.fillText(`${mapSize} tiles (${gridSz}×${gridSz} grid, ${getTargetDeadEnds(mapSize)} dead ends)`, W / 2, layout.mapSliderTextY);
 
       // Start button
       const sr = layout.startBtn;
@@ -1831,7 +1939,7 @@
         const eTop = enemy.y - EH / 2, eBottom = enemy.y + EH / 2;
 
         if (pLeft < eRight && pRight > eLeft && pTop < eBottom && pBottom > eTop) {
-          if (!invincible) { lost = true; gameState = 'lost'; bgMusic.pause(); }
+          if (!invincible && !playerInLocker) { lost = true; gameState = 'lost'; bgMusic.pause(); }
         }
       }
     }
