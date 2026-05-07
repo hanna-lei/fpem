@@ -226,6 +226,11 @@
     const APPLE_TILE_H = 4;
     const apples = [];
 
+    // ============ FLASHLIGHT ============
+    const flashlightImg = new Image();
+    flashlightImg.src = 'imgs/flashlight.png';
+    const flashlights = [];
+
     // ============ LOCKERS ============
     const lockers = [];
     let playerInLocker = false;
@@ -246,7 +251,10 @@
     const KITKAT_SLOW_DURATION = 3; // 3 seconds
     const KITKAT_SLOW_MULT = 0.5;
     const kitkatSlowTimers = [];
+    const flashlightTimers = [];
+    const FLASHLIGHT_DURATION = 5; // 5 seconds
     let kitkatSlowActive = false;
+    let flashlightActive = false;
 
     // ============ ABILITY CONSTANTS ============
     const CIRCLE_AURA_RADIUS = 20 * T;
@@ -666,6 +674,7 @@
     let oreoCount = 1;
     let kitkatCount = 1;
     let appleCount = 1;
+    let flashlightCount = 1;
     let draggingItemSlider = -1;
 
     // ============ LOCKERS ============
@@ -796,6 +805,7 @@
       oreos.length = 0;
       kitkats.length = 0;
       apples.length = 0;
+      flashlights.length = 0;
       lockers.length = 0;
       playerInLocker = false;
       lockerTimer = 0;
@@ -869,6 +879,27 @@
         const center = cellCenterPx(ar, ac);
         apples.push({ x: center.x, y: center.y, collected: false, r: ar, c: ac });
         blocked.add(cellKey(ar, ac));
+      }
+
+      // Place Flashlights — NOT in dead ends
+      const numFlashlights = (itemsEnabled && darknessEnabled) ? flashlightCount : 0;
+      const flashlightCandidates = [];
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        const k = cellKey(r, c);
+        if (blocked.has(k) || deadEndSet.has(k)) continue;
+        if (Math.abs(r - startCell.r) <= 1 && Math.abs(c - startCell.c) <= 1) continue;
+        if (Math.abs(r - exitCell.r) <= 1 && Math.abs(c - exitCell.c) <= 1) continue;
+        if ((r === 0 && c === 0) || (r === 0 && c === cols - 1) ||
+          (r === rows - 1 && c === 0) || (r === rows - 1 && c === cols - 1)) continue;
+        flashlightCandidates.push([r, c]);
+      }
+      shuffleInPlace(flashlightCandidates);
+
+      while (flashlights.length < numFlashlights && flashlightCandidates.length > 0) {
+        const [fr, fc] = flashlightCandidates.pop();
+        const center = cellCenterPx(fr, fc);
+        flashlights.push({ x: center.x, y: center.y, collected: false, r: fr, c: fc });
+        blocked.add(cellKey(fr, fc));
       }
 
       // Locker helper — returns wall spots for a cell, picking only ONE spot
@@ -996,6 +1027,7 @@
           if (draggingItemSlider === 0) oreoCount = count;
           else if (draggingItemSlider === 1) kitkatCount = count;
           else if (draggingItemSlider === 2) appleCount = count;
+          else if (draggingItemSlider === 3 && darknessEnabled) flashlightCount = count;
         } else if (draggingLockerSlider && lockersEnabled && layout.lockerSlider) {
           const sr = layout.lockerSlider;
           let val = (mouseX - sr.x) / sr.w;
@@ -1012,6 +1044,7 @@
           oreoCount = half;
           kitkatCount = half;
           appleCount = half;
+          flashlightCount = half;
           lockerCount = half;
         }
       }
@@ -1032,7 +1065,8 @@
           }
         }
         if (itemsEnabled && layout.itemSliders) {
-          for (let i = 0; i < 3; i++) {
+          const numSliders = darknessEnabled ? 4 : 3;
+          for (let i = 0; i < numSliders; i++) {
             const sr = layout.itemSliders[i];
             if (mouseX >= sr.x - 10 && mouseX <= sr.x + sr.w + 10 && mouseY >= sr.y - 10 && mouseY <= sr.y + sr.h + 10) {
               draggingItemSlider = i;
@@ -1042,6 +1076,7 @@
               if (i === 0) oreoCount = count;
               else if (i === 1) kitkatCount = count;
               else if (i === 2) appleCount = count;
+              else if (i === 3 && darknessEnabled) flashlightCount = count;
               return;
             }
           }
@@ -1068,6 +1103,7 @@
             oreoCount = half;
             kitkatCount = half;
             appleCount = half;
+            flashlightCount = half;
             lockerCount = half;
             return;
           }
@@ -1222,11 +1258,20 @@
       let itemSlidersTextY = null;
       if (itemsEnabled) {
         y += 40;
-        itemSliders = [
-          { x: W / 2 - 170, y: y, w: 100, h: 10 },
-          { x: W / 2 - 50, y: y, w: 100, h: 10 },
-          { x: W / 2 + 70, y: y, w: 100, h: 10 }
-        ];
+        if (darknessEnabled) {
+          itemSliders = [
+            { x: W / 2 - 200, y: y, w: 80, h: 10 },
+            { x: W / 2 - 100, y: y, w: 80, h: 10 },
+            { x: W / 2 + 0, y: y, w: 80, h: 10 },
+            { x: W / 2 + 100, y: y, w: 80, h: 10 }
+          ];
+        } else {
+          itemSliders = [
+            { x: W / 2 - 170, y: y, w: 100, h: 10 },
+            { x: W / 2 - 50, y: y, w: 100, h: 10 },
+            { x: W / 2 + 70, y: y, w: 100, h: 10 }
+          ];
+        }
         y += 30;
         itemSlidersTextY = y;
       }
@@ -1352,9 +1397,10 @@
 
       if (itemsEnabled && layout.itemSliders) {
         const maxDE = getTargetDeadEnds(mapSize);
-        const counts = [oreoCount, kitkatCount, appleCount];
-        const labels = ['Oreos', 'KitKats', 'Apples'];
-        for (let i = 0; i < 3; i++) {
+        const counts = darknessEnabled ? [oreoCount, kitkatCount, appleCount, flashlightCount] : [oreoCount, kitkatCount, appleCount];
+        const labels = darknessEnabled ? ['Oreos', 'KitKats', 'Apples', 'Flashlights'] : ['Oreos', 'KitKats', 'Apples'];
+        const numSliders = darknessEnabled ? 4 : 3;
+        for (let i = 0; i < numSliders; i++) {
           const slr = layout.itemSliders[i];
           ctx.fillStyle = '#333';
           ctx.fillRect(slr.x, slr.y, slr.w, slr.h);
@@ -1583,16 +1629,19 @@
         if (inventory[0] === 'oreo') { inventory[0] = null; invincibleTimers.push(INVINCIBLE_DURATION); }
         else if (inventory[0] === 'kitkat') { inventory[0] = null; kitkatSlowTimers.push(KITKAT_SLOW_DURATION); }
         else if (inventory[0] === 'apple') { inventory[0] = null; stamina = Math.min(MAX_STAMINA, stamina + MAX_STAMINA / 2); sprintExhausted = false; }
+        else if (inventory[0] === 'flashlight') { inventory[0] = null; flashlightTimers.push(FLASHLIGHT_DURATION); }
       }
       if ((e.key === 's' || e.key === 'S') && gameState === 'playing') {
         if (inventory[1] === 'oreo') { inventory[1] = null; invincibleTimers.push(INVINCIBLE_DURATION); }
         else if (inventory[1] === 'kitkat') { inventory[1] = null; kitkatSlowTimers.push(KITKAT_SLOW_DURATION); }
         else if (inventory[1] === 'apple') { inventory[1] = null; stamina = Math.min(MAX_STAMINA, stamina + MAX_STAMINA / 2); sprintExhausted = false; }
+        else if (inventory[1] === 'flashlight') { inventory[1] = null; flashlightTimers.push(FLASHLIGHT_DURATION); }
       }
       if ((e.key === 'd' || e.key === 'D') && gameState === 'playing') {
         if (inventory[2] === 'oreo') { inventory[2] = null; invincibleTimers.push(INVINCIBLE_DURATION); }
         else if (inventory[2] === 'kitkat') { inventory[2] = null; kitkatSlowTimers.push(KITKAT_SLOW_DURATION); }
         else if (inventory[2] === 'apple') { inventory[2] = null; stamina = Math.min(MAX_STAMINA, stamina + MAX_STAMINA / 2); sprintExhausted = false; }
+        else if (inventory[2] === 'flashlight') { inventory[2] = null; flashlightTimers.push(FLASHLIGHT_DURATION); }
       }
     });
     document.addEventListener('keyup', e => { keys[e.key] = false; });
@@ -1725,6 +1774,13 @@
         if (kitkatSlowTimers[i] <= 0) kitkatSlowTimers.splice(i, 1);
       }
       kitkatSlowActive = kitkatSlowTimers.length > 0;
+
+      // Flashlight timers
+      for (let i = flashlightTimers.length - 1; i >= 0; i--) {
+        flashlightTimers[i] -= dt;
+        if (flashlightTimers[i] <= 0) flashlightTimers.splice(i, 1);
+      }
+      flashlightActive = flashlightTimers.length > 0;
 
       // Bloomie cycle
       if (enemy.active && enemyVariant.name === 'Miss Bloomie') {
@@ -1885,6 +1941,20 @@
           if (slot !== -1) {
             inventory[slot] = 'kitkat';
             kk.collected = true;
+          }
+        }
+      }
+
+      // Pickup flashlight
+      for (const fl of flashlights) {
+        if (fl.collected) continue;
+        const fdx = Math.abs(player.x - fl.x);
+        const fdy = Math.abs(player.y - fl.y);
+        if (fdx < 4 * T && fdy < 4 * T) {
+          const slot = inventory.indexOf(null);
+          if (slot !== -1) {
+            inventory[slot] = 'flashlight';
+            fl.collected = true;
           }
         }
       }
@@ -2082,6 +2152,18 @@
         }
       }
 
+      // Flashlight on map
+      if (flashlightImg.complete && flashlightImg.naturalWidth > 0) {
+        const flDrawW = 6 * T;
+        const flDrawH = (flashlightImg.naturalHeight / flashlightImg.naturalWidth) * flDrawW;
+        for (const fl of flashlights) {
+          if (fl.collected) continue;
+          const fx = fl.x - camX - flDrawW / 2;
+          const fy = fl.y - camY - flDrawH / 2;
+          ctx.drawImage(flashlightImg, fx, fy, flDrawW, flDrawH);
+        }
+      }
+
       if (enemy.active) drawEnemy(enemy.x - camX, enemy.y - camY);
 
       // Lockers
@@ -2193,7 +2275,7 @@
         dctx.globalCompositeOperation = 'destination-out';
         const cx = playerInLocker ? (player.x - camX) : W / 2;
         const cy = playerInLocker ? (player.y - camY) : H / 2;
-        const currentDarknessRadius = darknessRadiusTiles * T;
+        const currentDarknessRadius = (darknessRadiusTiles * T) * (1 + 0.25 * flashlightTimers.length);
         const currentDarknessOuter = currentDarknessRadius * 1.12;
         const innerR = currentDarknessRadius * 0.12;
         const grad = dctx.createRadialGradient(cx, cy, innerR, cx, cy, currentDarknessOuter);
@@ -2263,6 +2345,11 @@
           const iconH = invRadius * 1.8;
           const iconW = (appleImg.naturalWidth / appleImg.naturalHeight) * iconH;
           ctx.drawImage(appleImg, cx - iconW / 2, cy - iconH / 2, iconW, iconH);
+        }
+        if (inventory[i] === 'flashlight' && flashlightImg.complete && flashlightImg.naturalWidth > 0) {
+          const iconW = invRadius * 2.7;
+          const iconH = (flashlightImg.naturalHeight / flashlightImg.naturalWidth) * iconW;
+          ctx.drawImage(flashlightImg, cx - iconW / 2, cy - iconH / 2, iconW, iconH);
         }
       }
 
