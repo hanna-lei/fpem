@@ -1818,7 +1818,9 @@
       }
 
       // Apply KitKat slow after variant logic
-      if (kitkatSlowActive) currentEnemySpeed *= KITKAT_SLOW_MULT;
+      if (kitkatSlowTimers.length > 0) {
+        currentEnemySpeed *= Math.pow(KITKAT_SLOW_MULT, kitkatSlowTimers.length);
+      }
       if (playerInLocker) currentEnemySpeed *= 0.85;
 
       // Circle aura slow (blocked by invincible)
