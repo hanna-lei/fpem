@@ -89,6 +89,7 @@
       { label: 'Tutorial', active: false },
       { label: 'Play', active: false },
       { label: 'Randomize', active: true },
+      { label: 'Characters', active: false },
       { label: 'Info', active: false }
     ],
     mouseX: 0,

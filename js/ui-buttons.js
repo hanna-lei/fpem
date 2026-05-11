@@ -5,7 +5,9 @@
   F.getButtonRects = function () {
     var W = state.canvas.width, H = state.canvas.height;
     var btnW = 280, btnH = 50, gap = 18;
-    var startY = H / 2 + 20;
+    var titleBottomY = 165;
+    var totalH = state.menuButtons.length * btnH + (state.menuButtons.length - 1) * gap;
+    var startY = titleBottomY + (H - titleBottomY - totalH) / 2;
     return state.menuButtons.map(function (btn, i) {
       return {
         x: W / 2 - btnW / 2,

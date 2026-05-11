@@ -12,11 +12,11 @@
 
     state.ctx.fillStyle = '#f0e6d3';
     state.ctx.font = 'bold 42px Arial';
-    state.ctx.fillText('Fundamental Paper Education', W / 2, H / 2 - 120);
+    state.ctx.fillText('Fundamental Paper Education', W / 2, 70);
 
     state.ctx.fillStyle = '#ffffff';
     state.ctx.font = 'bold 56px Arial';
-    state.ctx.fillText('MAZE', W / 2, H / 2 - 60);
+    state.ctx.fillText('MAZE', W / 2, 130);
 
     var rects = F.getButtonRects();
     var hovered = F.getHoveredButton();
