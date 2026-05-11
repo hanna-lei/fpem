@@ -7,7 +7,7 @@
   var BLOOMIE_SLOW_AMOUNT = F.BLOOMIE_SLOW_AMOUNT;
   var BLOOMIE_SLOW_DURATION = F.BLOOMIE_SLOW_DURATION;
   var ASSIGNMENT_CHALLENGE_DURATION = F.ASSIGNMENT_CHALLENGE_DURATION;
-  var ASSIGNMENT_TEACHER_EFFECT_DURATION = F.ASSIGNMENT_TEACHER_EFFECT_DURATION;
+  var ASSIGNMENT_TEACHER_BOOST_DURATION = F.ASSIGNMENT_TEACHER_BOOST_DURATION;
   var ASSIGNMENT_TEACHER_SPEED_BOOST = F.ASSIGNMENT_TEACHER_SPEED_BOOST;
   var CIRCLE_AURA_RADIUS = F.CIRCLE_AURA_RADIUS;
   var CIRCLE_SLOW_AMOUNT = F.CIRCLE_SLOW_AMOUNT;
@@ -57,6 +57,7 @@
 
   F.finishAssignmentChallenge = function (correct) {
     if (!state.assignmentActive) return;
+    var timeLeft = Math.max(0, state.assignmentTimeLeft);
     state.assignmentActive = false;
     if (state.assignmentPausedAt > 0) {
       state.assignmentPausedMs += Date.now() - state.assignmentPausedAt;
@@ -65,14 +66,14 @@
     state.assignmentTimeLeft = 0;
     state.assignmentAnswer = '';
     if (correct) {
-      state.assignmentTeacherStunTimer = ASSIGNMENT_TEACHER_EFFECT_DURATION;
+      state.assignmentTeacherStunTimer = timeLeft * 1.5;
       state.assignmentTeacherBoostTimer = 0;
       state.playerSlowed = false;
       state.playerStunned = false;
       state.stunTimer = 0;
       F.recalcEnemyPath();
     } else {
-      state.assignmentTeacherBoostTimer = ASSIGNMENT_TEACHER_EFFECT_DURATION;
+      state.assignmentTeacherBoostTimer = ASSIGNMENT_TEACHER_BOOST_DURATION;
       state.assignmentTeacherStunTimer = 0;
     }
     state.lastTime = performance.now();
