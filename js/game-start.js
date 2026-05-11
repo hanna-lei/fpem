@@ -120,6 +120,7 @@
     state.assignmentPausedMs = 0;
     state.assignmentAnswer = '';
     state.assignmentTimeLeft = 0;
+    state.activeAssignment = null;
     state.assignmentsCompleted = 0;
     state.assignmentTeacherStunTimer = 0;
     state.assignmentTeacherBoostTimer = 0;

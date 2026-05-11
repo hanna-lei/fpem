@@ -43,8 +43,7 @@
   };
 
   F.startAssignmentChallenge = function (assignment) {
-    assignment.collected = true;
-    state.assignmentsCompleted++;
+    state.activeAssignment = assignment;
     state.assignmentA = Math.floor(Math.random() * 13);
     state.assignmentB = Math.floor(Math.random() * 13);
     state.assignmentAnswer = '';
@@ -63,6 +62,11 @@
       state.assignmentPausedMs += Date.now() - state.assignmentPausedAt;
       state.assignmentPausedAt = 0;
     }
+    if (state.activeAssignment && !state.activeAssignment.collected) {
+      state.activeAssignment.collected = true;
+      state.assignmentsCompleted++;
+    }
+    state.activeAssignment = null;
     state.assignmentTimeLeft = 0;
     state.assignmentAnswer = '';
     if (correct) {

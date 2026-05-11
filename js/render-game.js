@@ -80,7 +80,7 @@
     }
 
     if (state.enemy.active && assignmentImg.complete && assignmentImg.naturalWidth > 0) {
-      var assignmentDrawW = ASSIGNMENT_TILE_W * T;
+      var assignmentDrawW = ASSIGNMENT_TILE_W * T * 1.5;
       var assignmentDrawH = (oreoImg.complete && oreoImg.naturalWidth > 0) ?
         (oreoImg.naturalHeight / oreoImg.naturalWidth) * assignmentDrawW :
         (assignmentImg.naturalHeight / assignmentImg.naturalWidth) * assignmentDrawW;
@@ -316,6 +316,15 @@
       state.ctx.font = 'bold 18px Arial';
       state.ctx.textAlign = 'center';
       state.ctx.fillText('TEACHER BOOSTED: ' + Math.ceil(state.assignmentTeacherBoostTimer), W / 2, 88);
+    }
+
+    if (state.assignments.length > 0 && state.gameState === 'playing') {
+      var assignmentsLeft = F.remainingAssignments ? F.remainingAssignments() : 0;
+      state.ctx.fillStyle = '#ff3333';
+      state.ctx.font = 'bold 22px Arial';
+      state.ctx.textAlign = 'center';
+      state.ctx.textBaseline = 'top';
+      state.ctx.fillText(assignmentsLeft > 0 ? assignmentsLeft + ' assignment(s) remaining!' : 'Find the exit!', W / 2, 12);
     }
 
     if (state.assignmentActive) {

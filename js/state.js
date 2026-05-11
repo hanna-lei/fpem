@@ -119,6 +119,7 @@
     assignmentTimeLeft: 0,
     assignmentPausedAt: 0,
     assignmentPausedMs: 0,
+    activeAssignment: null,
     assignmentsCompleted: 0,
     assignmentTeacherStunTimer: 0,
     assignmentTeacherBoostTimer: 0
