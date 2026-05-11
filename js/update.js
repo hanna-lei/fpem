@@ -6,6 +6,9 @@
   var BLOOMIE_COOLDOWN = F.BLOOMIE_COOLDOWN;
   var BLOOMIE_SLOW_AMOUNT = F.BLOOMIE_SLOW_AMOUNT;
   var BLOOMIE_SLOW_DURATION = F.BLOOMIE_SLOW_DURATION;
+  var ASSIGNMENT_CHALLENGE_DURATION = F.ASSIGNMENT_CHALLENGE_DURATION;
+  var ASSIGNMENT_TEACHER_EFFECT_DURATION = F.ASSIGNMENT_TEACHER_EFFECT_DURATION;
+  var ASSIGNMENT_TEACHER_SPEED_BOOST = F.ASSIGNMENT_TEACHER_SPEED_BOOST;
   var CIRCLE_AURA_RADIUS = F.CIRCLE_AURA_RADIUS;
   var CIRCLE_SLOW_AMOUNT = F.CIRCLE_SLOW_AMOUNT;
   var ENEMY_REPATH_INTERVAL = F.ENEMY_REPATH_INTERVAL;
@@ -26,6 +29,55 @@
   var THAVEL_STUN_DURATION = F.THAVEL_STUN_DURATION;
   var THAVEL_STUN_RADIUS = F.THAVEL_STUN_RADIUS;
 
+  F.getElapsedSec = function () {
+    var activePauseMs = state.assignmentActive && state.assignmentPausedAt > 0 ? Date.now() - state.assignmentPausedAt : 0;
+    return Math.max(0, (Date.now() - state.startTime - state.assignmentPausedMs - activePauseMs) / 1000);
+  };
+
+  F.remainingAssignments = function () {
+    var remaining = 0;
+    for (var i = 0; i < state.assignments.length; i++) {
+      if (!state.assignments[i].collected) remaining++;
+    }
+    return remaining;
+  };
+
+  F.startAssignmentChallenge = function (assignment) {
+    assignment.collected = true;
+    state.assignmentsCompleted++;
+    state.assignmentA = Math.floor(Math.random() * 13);
+    state.assignmentB = Math.floor(Math.random() * 13);
+    state.assignmentAnswer = '';
+    state.assignmentTimeLeft = ASSIGNMENT_CHALLENGE_DURATION;
+    state.assignmentPausedAt = Date.now();
+    state.assignmentActive = true;
+    state.sprinting = false;
+    for (var key in state.keys) state.keys[key] = false;
+  };
+
+  F.finishAssignmentChallenge = function (correct) {
+    if (!state.assignmentActive) return;
+    state.assignmentActive = false;
+    if (state.assignmentPausedAt > 0) {
+      state.assignmentPausedMs += Date.now() - state.assignmentPausedAt;
+      state.assignmentPausedAt = 0;
+    }
+    state.assignmentTimeLeft = 0;
+    state.assignmentAnswer = '';
+    if (correct) {
+      state.assignmentTeacherStunTimer = ASSIGNMENT_TEACHER_EFFECT_DURATION;
+      state.assignmentTeacherBoostTimer = 0;
+      state.playerSlowed = false;
+      state.playerStunned = false;
+      state.stunTimer = 0;
+      F.recalcEnemyPath();
+    } else {
+      state.assignmentTeacherBoostTimer = ASSIGNMENT_TEACHER_EFFECT_DURATION;
+      state.assignmentTeacherStunTimer = 0;
+    }
+    state.lastTime = performance.now();
+  };
+
   F.update = function () {
     var now = performance.now();
     var dt = Math.min((now - state.lastTime) / 1000, 1 / 15);
@@ -34,7 +86,13 @@
     if (state.gameState !== 'playing') return;
     if (state.won || state.lost) return;
 
-    var elapsedSec = (Date.now() - state.startTime) / 1000;
+    if (state.assignmentActive) {
+      state.assignmentTimeLeft -= dt;
+      if (state.assignmentTimeLeft <= 0) F.finishAssignmentChallenge(false);
+      return;
+    }
+
+    var elapsedSec = F.getElapsedSec();
     state.elapsed = elapsedSec.toFixed(1);
 
     if (state.stunTimer > 0) {
@@ -64,6 +122,15 @@
       if (state.flashlightTimers[fi] <= 0) state.flashlightTimers.splice(fi, 1);
     }
     state.flashlightActive = state.flashlightTimers.length > 0;
+
+    if (state.assignmentTeacherStunTimer > 0) {
+      state.assignmentTeacherStunTimer -= dt;
+      if (state.assignmentTeacherStunTimer < 0) state.assignmentTeacherStunTimer = 0;
+    }
+    if (state.assignmentTeacherBoostTimer > 0) {
+      state.assignmentTeacherBoostTimer -= dt;
+      if (state.assignmentTeacherBoostTimer < 0) state.assignmentTeacherBoostTimer = 0;
+    }
 
     if (state.enemy.active && state.enemyVariant.name === 'Miss Bloomie') {
       if (state.bloomieState === 'ready') {
@@ -98,14 +165,16 @@
 
     if (state.kitkatSlowActive) state.currentEnemySpeed *= KITKAT_SLOW_MULT;
     if (state.playerInLocker) state.currentEnemySpeed *= 0.85;
+    if (state.assignmentTeacherBoostTimer > 0) state.currentEnemySpeed *= ASSIGNMENT_TEACHER_SPEED_BOOST;
+    if (state.assignmentTeacherStunTimer > 0) state.currentEnemySpeed = 0;
 
     state.playerSlowed = false;
-    if (state.enemy.active && state.enemyVariant.name === 'Miss Circle' && !state.invincible && !state.playerInLocker) {
+    if (state.enemy.active && state.assignmentTeacherStunTimer <= 0 && state.enemyVariant.name === 'Miss Circle' && !state.invincible && !state.playerInLocker) {
       var adx = state.player.x - state.enemy.x, ady = state.player.y - state.enemy.y;
       if (Math.sqrt(adx * adx + ady * ady) <= CIRCLE_AURA_RADIUS) state.playerSlowed = true;
     }
 
-    if (state.enemy.active && state.enemyVariant.name === 'Miss Thavel' && state.thavelStunCooldown <= 0 && !state.playerStunned && !state.invincible && !state.playerInLocker) {
+    if (state.enemy.active && state.assignmentTeacherStunTimer <= 0 && state.enemyVariant.name === 'Miss Thavel' && state.thavelStunCooldown <= 0 && !state.playerStunned && !state.invincible && !state.playerInLocker) {
       var adx2 = state.player.x - state.enemy.x, ady2 = state.player.y - state.enemy.y;
       if (Math.sqrt(adx2 * adx2 + ady2 * ady2) <= THAVEL_STUN_RADIUS) {
         state.playerStunned = true;
@@ -234,8 +303,22 @@
       }
     }
 
+    if (state.enemy.active) {
+      var assignment;
+      for (var asi = 0; asi < state.assignments.length; asi++) {
+        assignment = state.assignments[asi];
+        if (assignment.collected) continue;
+        var asdx = Math.abs(state.player.x - assignment.x);
+        var asdy = Math.abs(state.player.y - assignment.y);
+        if (asdx < 4 * T && asdy < 4 * T) {
+          F.startAssignmentChallenge(assignment);
+          return;
+        }
+      }
+    }
+
     var wx = state.player.x - state.exitX, wy = state.player.y - state.exitY;
-    if (Math.sqrt(wx * wx + wy * wy) < state.exitR) { state.won = true; state.gameState = 'won'; state.bgMusic.pause(); return; }
+    if (F.remainingAssignments() === 0 && Math.sqrt(wx * wx + wy * wy) < state.exitR) { state.won = true; state.gameState = 'won'; state.bgMusic.pause(); return; }
 
     if (elapsedSec >= ENEMY_SPAWN_DELAY) {
       if (!state.enemy.active) {
@@ -252,7 +335,7 @@
 
       var prevEX = state.enemy.x, prevEY = state.enemy.y;
 
-      if (state.enemyWaypoints.length > 0 && state.enemyWpIdx < state.enemyWaypoints.length) {
+      if (state.currentEnemySpeed > 0 && state.enemyWaypoints.length > 0 && state.enemyWpIdx < state.enemyWaypoints.length) {
         var remaining = state.currentEnemySpeed * dt;
         while (remaining > 0.1 && state.enemyWpIdx < state.enemyWaypoints.length) {
           var target = state.enemyWaypoints[state.enemyWpIdx];
@@ -294,7 +377,7 @@
       var eTop = state.enemy.y - state.EH / 2, eBottom = state.enemy.y + state.EH / 2;
 
       if (pLeft < eRight && pRight > eLeft && pTop < eBottom && pBottom > eTop) {
-        if (!state.invincible && !state.playerInLocker) { state.lost = true; state.gameState = 'lost'; state.bgMusic.pause(); }
+        if (!state.invincible && !state.playerInLocker && state.assignmentTeacherStunTimer <= 0) { state.lost = true; state.gameState = 'lost'; state.bgMusic.pause(); }
       }
     }
   };

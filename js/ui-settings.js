@@ -14,6 +14,9 @@
     if (state.itemsEnabled) totalH += 70;
 
     totalH += 50 + 35;
+    if (state.assignmentsEnabled) totalH += 70;
+
+    totalH += 50 + 35;
     if (state.lockersEnabled) totalH += 70;
 
     totalH += 50 + 35 + 60;
@@ -69,6 +72,20 @@
     }
 
     y += 50;
+    var assignmentsLabelY = y;
+    y += 35;
+    var assignmentsToggle = { x: W / 2 - 30, y: y, w: 60, h: 30 };
+
+    var assignmentSlider = null;
+    var assignmentSliderTextY = null;
+    if (state.assignmentsEnabled) {
+      y += 40;
+      assignmentSlider = { x: W / 2 - 50, y: y, w: 100, h: 10 };
+      y += 30;
+      assignmentSliderTextY = y;
+    }
+
+    y += 50;
     var lockersLabelY = y;
     y += 35;
     var lockersToggle = { x: W / 2 - 30, y: y, w: 60, h: 30 };
@@ -96,6 +113,7 @@
       titleY: titleY,
       darknessLabelY: darknessLabelY, darknessToggle: darknessToggle, darknessDescY: darknessDescY, darknessSlider: darknessSlider, darknessSliderTextY: darknessSliderTextY,
       itemsLabelY: itemsLabelY, itemsToggle: itemsToggle, itemSliders: itemSliders, itemSlidersTextY: itemSlidersTextY,
+      assignmentsLabelY: assignmentsLabelY, assignmentsToggle: assignmentsToggle, assignmentSlider: assignmentSlider, assignmentSliderTextY: assignmentSliderTextY,
       lockersLabelY: lockersLabelY, lockersToggle: lockersToggle, lockerSlider: lockerSlider, lockerSliderTextY: lockerSliderTextY,
       mapSizeLabelY: mapSizeLabelY, mapSlider: mapSlider, mapSliderTextY: mapSliderTextY,
       startBtn: startBtn
@@ -158,6 +176,48 @@
       state.ctx.fillStyle = '#aaa';
       state.ctx.font = '14px Arial';
       state.ctx.fillText('Light amount: ' + state.darknessRadiusTiles + ' tiles', W / 2, layout.darknessSliderTextY);
+    }
+
+    state.ctx.fillStyle = '#fff';
+    state.ctx.font = 'bold 22px Arial';
+    state.ctx.fillText('Assignments', W / 2, layout.assignmentsLabelY);
+
+    var atog = layout.assignmentsToggle;
+    state.ctx.fillStyle = state.assignmentsEnabled ? '#4caf50' : '#555';
+    var atogR = atog.h / 2;
+    state.ctx.beginPath();
+    state.ctx.arc(atog.x + atogR, atog.y + atogR, atogR, Math.PI * 0.5, Math.PI * 1.5);
+    state.ctx.arc(atog.x + atog.w - atogR, atog.y + atogR, atogR, Math.PI * 1.5, Math.PI * 0.5);
+    state.ctx.closePath();
+    state.ctx.fill();
+
+    state.ctx.fillStyle = '#fff';
+    var aknobX = state.assignmentsEnabled ? atog.x + atog.w - atogR : atog.x + atogR;
+    state.ctx.beginPath();
+    state.ctx.arc(aknobX, atog.y + atogR, atogR - 3, 0, Math.PI * 2);
+    state.ctx.fill();
+
+    if (state.assignmentsEnabled && layout.assignmentSlider) {
+      var aslr = layout.assignmentSlider;
+      var maxAssignments = Math.ceil(F.getTargetDeadEnds(state.mapSize) / 4);
+      state.assignmentCount = Math.max(0, Math.min(maxAssignments, state.assignmentCount));
+      state.ctx.fillStyle = '#333';
+      state.ctx.fillRect(aslr.x, aslr.y, aslr.w, aslr.h);
+
+      var fillPctA = maxAssignments > 0 ? state.assignmentCount / maxAssignments : 0;
+      var fillWA = fillPctA * aslr.w;
+      state.ctx.fillStyle = '#4caf50';
+      state.ctx.fillRect(aslr.x, aslr.y, fillWA, aslr.h);
+
+      var knobXA = aslr.x + fillWA;
+      state.ctx.beginPath();
+      state.ctx.arc(knobXA, aslr.y + aslr.h / 2, 8, 0, Math.PI * 2);
+      state.ctx.fillStyle = '#fff';
+      state.ctx.fill();
+
+      state.ctx.fillStyle = '#aaa';
+      state.ctx.font = '14px Arial';
+      state.ctx.fillText('Assignments: ' + state.assignmentCount + ' / ' + maxAssignments, aslr.x + aslr.w / 2, layout.assignmentSliderTextY);
     }
 
     state.ctx.fillStyle = '#fff';

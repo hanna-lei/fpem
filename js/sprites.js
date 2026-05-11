@@ -19,6 +19,8 @@
   F.circleSprite = loadFrames('circle', 4, 'png');
   F.oreoImg = new Image();
   F.oreoImg.src = 'imgs/oreo.png';
+  F.assignmentImg = new Image();
+  F.assignmentImg.src = 'imgs/assignment.png';
   F.kitkatImg = new Image();
   F.kitkatImg.src = 'imgs/kitkats.PNG';
   F.appleImg = new Image();

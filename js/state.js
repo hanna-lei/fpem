@@ -73,6 +73,9 @@
     appleCount: 1,
     flashlightCount: 1,
     draggingItemSlider: -1,
+    assignmentsEnabled: true,
+    assignmentCount: 1,
+    draggingAssignmentSlider: false,
     lockersEnabled: true,
     lockerCount: 1,
     draggingLockerSlider: false,
@@ -93,6 +96,7 @@
     keys: {},
     lastTime: performance.now(),
     oreos: [],
+    assignments: [],
     kitkats: [],
     apples: [],
     flashlights: [],
@@ -107,6 +111,16 @@
     kitkatSlowTimers: [],
     flashlightTimers: [],
     kitkatSlowActive: false,
-    flashlightActive: false
+    flashlightActive: false,
+    assignmentActive: false,
+    assignmentA: 0,
+    assignmentB: 0,
+    assignmentAnswer: '',
+    assignmentTimeLeft: 0,
+    assignmentPausedAt: 0,
+    assignmentPausedMs: 0,
+    assignmentsCompleted: 0,
+    assignmentTeacherStunTimer: 0,
+    assignmentTeacherBoostTimer: 0
   };
 })();

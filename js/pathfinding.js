@@ -47,27 +47,8 @@
       var hw = state.enemyVariant.w / 2, hh = state.enemyVariant.h / 2;
 
       var targetIdx = 0;
-      var foundTarget = false;
-
-      if (state.enemyWaypoints && state.enemyWaypoints.length > 0 && state.enemyWpIdx < state.enemyWaypoints.length) {
-        var currentTarget = state.enemyWaypoints[state.enemyWpIdx];
-        for (var i = 0; i < path.length; i++) {
-          if (path[i].x === currentTarget.x && path[i].y === currentTarget.y) {
-            targetIdx = i;
-            foundTarget = true;
-            break;
-          }
-        }
-      }
-
-      if (!foundTarget) {
-        var closestD2 = Infinity;
-        for (var j = 0; j < path.length; j++) {
-          var pdx = path[j].x - state.enemy.x;
-          var pdy = path[j].y - state.enemy.y;
-          var d2 = pdx * pdx + pdy * pdy;
-          if (d2 < closestD2) { closestD2 = d2; targetIdx = j; }
-        }
+      if (path.length > 1 && F.hasLineOfSight(state.enemy.x, state.enemy.y, path[1].x, path[1].y, hw, hh)) {
+        targetIdx = 1;
       }
 
       var MAX_SKIP = 3;

@@ -20,7 +20,7 @@
     if (document.hidden) {
       state.pausedAt = Date.now();
     } else {
-      if (state.pausedAt > 0 && state.gameState === 'playing') {
+      if (state.pausedAt > 0 && state.gameState === 'playing' && !state.assignmentActive) {
         state.startTime += Date.now() - state.pausedAt;
       }
       state.lastTime = performance.now();
@@ -55,6 +55,11 @@
         var val3 = (state.mouseX - srL.x) / srL.w;
         val3 = Math.max(0, Math.min(1, val3));
         state.lockerCount = Math.round(val3 * maxDE);
+      } else if (state.draggingAssignmentSlider && state.assignmentsEnabled && layout.assignmentSlider) {
+        var srA = layout.assignmentSlider;
+        var valA = (state.mouseX - srA.x) / srA.w;
+        valA = Math.max(0, Math.min(1, valA));
+        state.assignmentCount = Math.round(valA * Math.ceil(maxDE / 4));
       } else if (state.draggingMapSlider && layout.mapSlider) {
         var srM = layout.mapSlider;
         var val4 = (state.mouseX - srM.x) / srM.w;
@@ -67,6 +72,7 @@
         state.appleCount = half;
         state.flashlightCount = half;
         state.lockerCount = half;
+        state.assignmentCount = Math.ceil(newMax / 4);
       }
     }
   });
@@ -102,6 +108,16 @@
           }
         }
       }
+      if (state.assignmentsEnabled && layout.assignmentSlider) {
+        var srAssign = layout.assignmentSlider;
+        if (state.mouseX >= srAssign.x - 10 && state.mouseX <= srAssign.x + srAssign.w + 10 && state.mouseY >= srAssign.y - 10 && state.mouseY <= srAssign.y + srAssign.h + 10) {
+          state.draggingAssignmentSlider = true;
+          var va = (state.mouseX - srAssign.x) / srAssign.w;
+          va = Math.max(0, Math.min(1, va));
+          state.assignmentCount = Math.round(va * Math.ceil(maxDE2 / 4));
+          return;
+        }
+      }
       if (state.lockersEnabled && layout.lockerSlider) {
         var srLock = layout.lockerSlider;
         if (state.mouseX >= srLock.x - 10 && state.mouseX <= srLock.x + srLock.w + 10 && state.mouseY >= srLock.y - 10 && state.mouseY <= srLock.y + srLock.h + 10) {
@@ -126,6 +142,7 @@
           state.appleCount = half2;
           state.flashlightCount = half2;
           state.lockerCount = half2;
+          state.assignmentCount = Math.ceil(newMax2 / 4);
           return;
         }
       }
@@ -142,6 +159,7 @@
   state.canvas.addEventListener('mouseup', function () {
     state.isDraggingSlider = false;
     state.draggingItemSlider = -1;
+    state.draggingAssignmentSlider = false;
     state.draggingLockerSlider = false;
     state.draggingMapSlider = false;
   });
@@ -162,6 +180,10 @@
       }
       if (state.mouseX >= layout2.itemsToggle.x && state.mouseX <= layout2.itemsToggle.x + layout2.itemsToggle.w && state.mouseY >= layout2.itemsToggle.y && state.mouseY <= layout2.itemsToggle.y + layout2.itemsToggle.h) {
         state.itemsEnabled = !state.itemsEnabled;
+      }
+      if (state.mouseX >= layout2.assignmentsToggle.x && state.mouseX <= layout2.assignmentsToggle.x + layout2.assignmentsToggle.w && state.mouseY >= layout2.assignmentsToggle.y && state.mouseY <= layout2.assignmentsToggle.y + layout2.assignmentsToggle.h) {
+        state.assignmentsEnabled = !state.assignmentsEnabled;
+        if (state.assignmentsEnabled && state.assignmentCount === 0) state.assignmentCount = Math.ceil(F.getTargetDeadEnds(state.mapSize) / 4);
       }
       if (state.mouseX >= layout2.lockersToggle.x && state.mouseX <= layout2.lockersToggle.x + layout2.lockersToggle.w && state.mouseY >= layout2.lockersToggle.y && state.mouseY <= layout2.lockersToggle.y + layout2.lockersToggle.h) {
         state.lockersEnabled = !state.lockersEnabled;
@@ -186,6 +208,20 @@
 
   document.addEventListener('keydown', function (e) {
     state.keys[e.key] = true;
+
+    if (state.assignmentActive) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        F.finishAssignmentChallenge(parseInt(state.assignmentAnswer, 10) === state.assignmentA * state.assignmentB);
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        state.assignmentAnswer = state.assignmentAnswer.slice(0, -1);
+      } else if (/^[0-9]$/.test(e.key) && state.assignmentAnswer.length < 3) {
+        e.preventDefault();
+        state.assignmentAnswer += e.key;
+      }
+      return;
+    }
 
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].indexOf(e.key) !== -1) e.preventDefault();
 

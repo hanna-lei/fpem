@@ -115,11 +115,20 @@
 
     state.flashlightTimers.length = 0;
     state.flashlightActive = false;
+    state.assignmentActive = false;
+    state.assignmentPausedAt = 0;
+    state.assignmentPausedMs = 0;
+    state.assignmentAnswer = '';
+    state.assignmentTimeLeft = 0;
+    state.assignmentsCompleted = 0;
+    state.assignmentTeacherStunTimer = 0;
+    state.assignmentTeacherBoostTimer = 0;
 
     state.roundPrepared = true;
 
     state.inventory[0] = null; state.inventory[1] = null; state.inventory[2] = null;
     state.oreos.length = 0;
+    state.assignments.length = 0;
     state.kitkats.length = 0;
     state.apples.length = 0;
     state.flashlights.length = 0;
@@ -229,6 +238,28 @@
       var fcenter = F.cellCenterPx(fr_, fc_);
       state.flashlights.push({ x: fcenter.x, y: fcenter.y, collected: false, r: fr_, c: fc_ });
       blocked[F.cellKey(fr_, fc_)] = true;
+    }
+
+    var numAssignments = state.assignmentsEnabled ? Math.min(state.assignmentCount, Math.ceil(targetDE / 4)) : 0;
+    var assignmentCandidates = [];
+    var cr, cc;
+    for (cr = 0; cr < state.rows; cr++) for (cc = 0; cc < state.cols; cc++) {
+      k = F.cellKey(cr, cc);
+      if (blocked[k] || deadEndSet[k]) continue;
+      if (Math.abs(cr - startCell.r) <= 1 && Math.abs(cc - startCell.c) <= 1) continue;
+      if (Math.abs(cr - exitCell.r) <= 1 && Math.abs(cc - exitCell.c) <= 1) continue;
+      if ((cr === 0 && cc === 0) || (cr === 0 && cc === state.cols - 1) ||
+        (cr === state.rows - 1 && cc === 0) || (cr === state.rows - 1 && cc === state.cols - 1)) continue;
+      assignmentCandidates.push([cr, cc]);
+    }
+    F.shuffleInPlace(assignmentCandidates);
+
+    while (state.assignments.length < numAssignments && assignmentCandidates.length > 0) {
+      var asg = assignmentCandidates.pop();
+      var asr = asg[0], asc = asg[1];
+      var ascenter = F.cellCenterPx(asr, asc);
+      state.assignments.push({ x: ascenter.x, y: ascenter.y, collected: false, r: asr, c: asc });
+      blocked[F.cellKey(asr, asc)] = true;
     }
 
     function getLockerSpotsForCell(r, c) {

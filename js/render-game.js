@@ -2,10 +2,13 @@
   var F = window.FPEM;
   var state = F.state;
   var oreoImg = F.oreoImg;
+  var assignmentImg = F.assignmentImg;
   var kitkatImg = F.kitkatImg;
   var appleImg = F.appleImg;
   var flashlightImg = F.flashlightImg;
   var APPLE_TILE_H = F.APPLE_TILE_H;
+  var ASSIGNMENT_CHALLENGE_DURATION = F.ASSIGNMENT_CHALLENGE_DURATION;
+  var ASSIGNMENT_TILE_W = F.ASSIGNMENT_TILE_W;
   var ENEMY_SPAWN_DELAY = F.ENEMY_SPAWN_DELAY;
   var KITKAT_TILE_W = F.KITKAT_TILE_W;
   var MAX_STAMINA = F.MAX_STAMINA;
@@ -27,24 +30,29 @@
     var ddx = Math.max(0, -camX), ddy = Math.max(0, -camY);
     if (sw > 0 && sh > 0) state.ctx.drawImage(state.mazeCanvas, sx, sy, sw, sh, ddx, ddy, sw, sh);
 
-    var exSX = state.exitX - camX, exSY = state.exitY - camY;
-    var pulse = Math.sin(Date.now() / 300) * 0.3 + 0.7;
-    state.ctx.globalAlpha = pulse;
-    state.ctx.fillStyle = '#4caf50';
-    state.ctx.beginPath(); state.ctx.arc(exSX, exSY, state.exitR, 0, Math.PI * 2); state.ctx.fill();
-    state.ctx.globalAlpha = 1;
+    var exitVisible = F.remainingAssignments ? F.remainingAssignments() === 0 : true;
+    if (exitVisible) {
+      var exSX = state.exitX - camX, exSY = state.exitY - camY;
+      var pulse = Math.sin(Date.now() / 300) * 0.3 + 0.7;
+      state.ctx.globalAlpha = pulse;
+      state.ctx.fillStyle = '#4caf50';
+      state.ctx.beginPath(); state.ctx.arc(exSX, exSY, state.exitR, 0, Math.PI * 2); state.ctx.fill();
+      state.ctx.globalAlpha = 1;
 
-    state.ctx.fillStyle = '#fff';
-    state.ctx.font = 'bold 18px Arial';
-    state.ctx.textAlign = 'center';
-    state.ctx.textBaseline = 'middle';
-    state.ctx.fillText('EXIT', exSX, exSY);
+      state.ctx.fillStyle = '#fff';
+      state.ctx.font = 'bold 18px Arial';
+      state.ctx.textAlign = 'center';
+      state.ctx.textBaseline = 'middle';
+      state.ctx.fillText('EXIT', exSX, exSY);
+    }
 
     var stSX = state.startTX * T - camX, stSY = state.startTY * T - camY;
     state.ctx.fillStyle = 'rgba(100,149,237,0.2)';
     state.ctx.beginPath(); state.ctx.arc(stSX, stSY, state.exitR, 0, Math.PI * 2); state.ctx.fill();
     state.ctx.fillStyle = '#6495ED';
     state.ctx.font = '13px Arial';
+    state.ctx.textAlign = 'center';
+    state.ctx.textBaseline = 'middle';
     state.ctx.fillText('START', stSX, stSY);
 
     if (oreoImg.complete && oreoImg.naturalWidth > 0) {
@@ -68,6 +76,20 @@
         var ax = apple.x - camX - appleDrawW / 2;
         var ay = apple.y - camY - appleDrawH / 2;
         state.ctx.drawImage(appleImg, ax, ay, appleDrawW, appleDrawH);
+      }
+    }
+
+    if (state.enemy.active && assignmentImg.complete && assignmentImg.naturalWidth > 0) {
+      var assignmentDrawW = ASSIGNMENT_TILE_W * T;
+      var assignmentDrawH = (oreoImg.complete && oreoImg.naturalWidth > 0) ?
+        (oreoImg.naturalHeight / oreoImg.naturalWidth) * assignmentDrawW :
+        (assignmentImg.naturalHeight / assignmentImg.naturalWidth) * assignmentDrawW;
+      for (var asi = 0; asi < state.assignments.length; asi++) {
+        var assignment = state.assignments[asi];
+        if (assignment.collected) continue;
+        var asx = assignment.x - camX - assignmentDrawW / 2;
+        var asy = assignment.y - camY - assignmentDrawH / 2;
+        state.ctx.drawImage(assignmentImg, asx, asy, assignmentDrawW, assignmentDrawH);
       }
     }
 
@@ -273,7 +295,7 @@
       }
     }
 
-    var elapsedSec = (Date.now() - state.startTime) / 1000;
+    var elapsedSec = F.getElapsedSec ? F.getElapsedSec() : (Date.now() - state.startTime) / 1000;
     if (!state.enemy.active && state.gameState === 'playing') {
       var secsLeft = Math.max(0, Math.ceil(ENEMY_SPAWN_DELAY - elapsedSec));
       if (secsLeft > 0) {
@@ -282,6 +304,52 @@
         state.ctx.textAlign = 'center';
         state.ctx.fillText('⚠️ ' + state.enemyVariant.name.toUpperCase() + ' ENTERS IN ' + secsLeft + '...', W / 2, 60);
       }
+    }
+
+    if (state.assignmentTeacherStunTimer > 0) {
+      state.ctx.fillStyle = '#88d8ff';
+      state.ctx.font = 'bold 18px Arial';
+      state.ctx.textAlign = 'center';
+      state.ctx.fillText('TEACHER STUNNED: ' + Math.ceil(state.assignmentTeacherStunTimer), W / 2, 88);
+    } else if (state.assignmentTeacherBoostTimer > 0) {
+      state.ctx.fillStyle = '#ff7777';
+      state.ctx.font = 'bold 18px Arial';
+      state.ctx.textAlign = 'center';
+      state.ctx.fillText('TEACHER BOOSTED: ' + Math.ceil(state.assignmentTeacherBoostTimer), W / 2, 88);
+    }
+
+    if (state.assignmentActive) {
+      var panelW = Math.min(460, W - 40);
+      var panelH = 220;
+      var panelX = W / 2 - panelW / 2;
+      var panelY = H / 2 - panelH / 2;
+      state.ctx.fillStyle = 'rgba(0,0,0,0.72)';
+      state.ctx.fillRect(0, 0, W, H);
+      state.ctx.fillStyle = '#f8f3e8';
+      state.ctx.strokeStyle = '#35354f';
+      state.ctx.lineWidth = 3;
+      state.ctx.fillRect(panelX, panelY, panelW, panelH);
+      state.ctx.strokeRect(panelX, panelY, panelW, panelH);
+
+      state.ctx.fillStyle = '#222';
+      state.ctx.textAlign = 'center';
+      state.ctx.textBaseline = 'middle';
+      state.ctx.font = 'bold 24px Arial';
+      state.ctx.fillText('Assignment', W / 2, panelY + 36);
+      state.ctx.font = 'bold 44px Arial';
+      state.ctx.fillText(state.assignmentA + ' × ' + state.assignmentB + ' = ?', W / 2, panelY + 95);
+      state.ctx.font = 'bold 32px Arial';
+      state.ctx.fillText(state.assignmentAnswer || '_', W / 2, panelY + 145);
+
+      var qbarX = panelX + 50, qbarY = panelY + panelH - 42, qbarW = panelW - 100, qbarH = 12;
+      state.ctx.fillStyle = '#333';
+      state.ctx.fillRect(qbarX, qbarY, qbarW, qbarH);
+      var pct = Math.max(0, state.assignmentTimeLeft / ASSIGNMENT_CHALLENGE_DURATION);
+      state.ctx.fillStyle = pct < 0.3 ? '#ff3333' : '#4caf50';
+      state.ctx.fillRect(qbarX, qbarY, qbarW * pct, qbarH);
+      state.ctx.strokeStyle = '#888';
+      state.ctx.lineWidth = 1;
+      state.ctx.strokeRect(qbarX, qbarY, qbarW, qbarH);
     }
 
     if (state.gameState === 'won') {
