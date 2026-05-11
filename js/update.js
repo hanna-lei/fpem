@@ -66,7 +66,7 @@
     state.assignmentTimeLeft = 0;
     state.assignmentAnswer = '';
     if (correct) {
-      state.assignmentTeacherStunTimer = timeLeft * 1.5;
+      state.assignmentTeacherStunTimer = Math.max(3, timeLeft * 1.5);
       state.assignmentTeacherBoostTimer = 0;
       state.playerSlowed = false;
       state.playerStunned = false;
