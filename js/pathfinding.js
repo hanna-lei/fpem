@@ -31,6 +31,21 @@
     return true;
   };
 
+  function isBehindEnemy(x, y) {
+    var dx = x - state.enemy.x;
+    var dy = y - state.enemy.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 1) return false;
+
+    var fx = 0, fy = 0;
+    if (state.enemy.dir === 0) fx = 1;
+    else if (state.enemy.dir === 2) fx = -1;
+    else if (state.enemy.dir === 1) fy = 1;
+    else if (state.enemy.dir === 3) fy = -1;
+
+    return dx * fx + dy * fy < -dist * 0.25;
+  }
+
   F.recalcEnemyPath = function () {
     var eCell = F.pxToCell(state.enemy.x, state.enemy.y);
     var targetX = state.player.x, targetY = state.player.y;
@@ -47,7 +62,18 @@
       var hw = state.enemyVariant.w / 2, hh = state.enemyVariant.h / 2;
 
       var targetIdx = 0;
-      if (path.length > 1 && F.hasLineOfSight(state.enemy.x, state.enemy.y, path[1].x, path[1].y, hw, hh)) {
+      var carriedTarget = null;
+      if (state.enemyWaypoints && state.enemyWaypoints.length > 0 && state.enemyWpIdx < state.enemyWaypoints.length) {
+        var currentTarget = state.enemyWaypoints[state.enemyWpIdx];
+        if (!isBehindEnemy(currentTarget.x, currentTarget.y) &&
+          F.hasLineOfSight(state.enemy.x, state.enemy.y, currentTarget.x, currentTarget.y, hw, hh)) {
+          carriedTarget = currentTarget;
+        }
+      }
+
+      if (carriedTarget) {
+        path.unshift(carriedTarget);
+      } else if (path.length > 1 && F.hasLineOfSight(state.enemy.x, state.enemy.y, path[1].x, path[1].y, hw, hh)) {
         targetIdx = 1;
       }
 
