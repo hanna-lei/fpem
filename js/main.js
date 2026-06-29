@@ -251,11 +251,11 @@
       }
     }
 
-    if ((e.key === 'q' || e.key === 'Q') && (state.gameState === 'won' || state.gameState === 'lost' || state.gameState === 'playing')) {
+    if ((e.key === 'i' || e.key === 'I') && (state.gameState === 'won' || state.gameState === 'lost' || state.gameState === 'playing')) {
       F.startGame();
     }
 
-    if ((e.key === 'w' || e.key === 'W') && state.gameState === 'playing') {
+    if ((e.key === 'o' || e.key === 'O') && state.gameState === 'playing') {
       state.gameState = 'menu';
       state.won = false;
       state.lost = false;
@@ -263,7 +263,7 @@
       state.bgMusic.currentTime = 0;
     }
 
-    if ((e.key === 'e' || e.key === 'E') && state.gameState === 'playing' && !state.won && !state.lost) {
+    if ((e.key === 'p' || e.key === 'P') && state.gameState === 'playing' && !state.won && !state.lost) {
       e.preventDefault();
       state.gameState = 'settings';
       state.bgMusic.pause();
