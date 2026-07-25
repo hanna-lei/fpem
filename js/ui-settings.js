@@ -109,7 +109,10 @@
     y += 50;
     var startBtn = { x: W / 2 - 140, y: y, w: 280, h: 50 };
 
+    var backBtn = { x: 20, y: 20, w: 50, h: 44 };
+
     return {
+      backBtn: backBtn,
       titleY: titleY,
       darknessLabelY: darknessLabelY, darknessToggle: darknessToggle, darknessDescY: darknessDescY, darknessSlider: darknessSlider, darknessSliderTextY: darknessSliderTextY,
       itemsLabelY: itemsLabelY, itemsToggle: itemsToggle, itemSliders: itemSliders, itemSlidersTextY: itemSlidersTextY,
@@ -350,5 +353,28 @@
     state.ctx.fillStyle = '#fff';
     state.ctx.font = 'bold 22px Arial';
     state.ctx.fillText('Start', sr.x + sr.w / 2, sr.y + sr.h / 2);
+
+    var bb = layout.backBtn;
+    var backHovered = state.mouseX >= bb.x && state.mouseX <= bb.x + bb.w && state.mouseY >= bb.y && state.mouseY <= bb.y + bb.h;
+    state.ctx.fillStyle = backHovered ? '#5a5a7e' : '#3a3a5e';
+    state.ctx.strokeStyle = backHovered ? '#888' : '#666';
+    var bbr = 10;
+    state.ctx.beginPath();
+    state.ctx.moveTo(bb.x + bbr, bb.y); state.ctx.lineTo(bb.x + bb.w - bbr, bb.y);
+    state.ctx.quadraticCurveTo(bb.x + bb.w, bb.y, bb.x + bb.w, bb.y + bbr);
+    state.ctx.lineTo(bb.x + bb.w, bb.y + bb.h - bbr);
+    state.ctx.quadraticCurveTo(bb.x + bb.w, bb.y + bb.h, bb.x + bb.w - bbr, bb.y + bb.h);
+    state.ctx.lineTo(bb.x + bbr, bb.y + bb.h);
+    state.ctx.quadraticCurveTo(bb.x, bb.y + bb.h, bb.x, bb.y + bb.h - bbr);
+    state.ctx.lineTo(bb.x, bb.y + bbr);
+    state.ctx.quadraticCurveTo(bb.x, bb.y, bb.x + bbr, bb.y);
+    state.ctx.closePath();
+    state.ctx.fill(); state.ctx.lineWidth = 2; state.ctx.stroke();
+
+    state.ctx.fillStyle = '#fff';
+    state.ctx.font = 'bold 28px Arial';
+    state.ctx.textAlign = 'center';
+    state.ctx.textBaseline = 'middle';
+    state.ctx.fillText('<', bb.x + bb.w / 2, bb.y + bb.h / 2 + 1);
   };
 })();

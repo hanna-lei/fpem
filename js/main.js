@@ -175,6 +175,11 @@
       }
     } else if (state.gameState === 'settings') {
       var layout2 = F.getSettingsLayout();
+      var backBtn = layout2.backBtn;
+      if (state.mouseX >= backBtn.x && state.mouseX <= backBtn.x + backBtn.w && state.mouseY >= backBtn.y && state.mouseY <= backBtn.y + backBtn.h) {
+        state.gameState = 'menu';
+        return;
+      }
       if (state.mouseX >= layout2.darknessToggle.x && state.mouseX <= layout2.darknessToggle.x + layout2.darknessToggle.w && state.mouseY >= layout2.darknessToggle.y && state.mouseY <= layout2.darknessToggle.y + layout2.darknessToggle.h) {
         state.darknessEnabled = !state.darknessEnabled;
       }
