@@ -43,7 +43,7 @@
     y += 60;
 
     var titleY0 = contentTop + 30;
-    var backBtn = { x: W / 2 - 340, y: titleY0 - 44, w: 100, h: 88 };
+    var backBtn = { x: W / 2 - 340, y: titleY0 - 25, w: 56, h: 50 };
 
     var darknessLabelY = y;
     y += 35;
@@ -386,7 +386,7 @@
     state.ctx.fill(); state.ctx.lineWidth = 2; state.ctx.stroke();
 
     state.ctx.fillStyle = '#fff';
-    state.ctx.font = 'bold 56px Arial';
+    state.ctx.font = 'bold 30px Arial';
     state.ctx.textAlign = 'center';
     state.ctx.textBaseline = 'middle';
     state.ctx.fillText('<', bb.x + bb.w / 2, bb.y + bb.h / 2 + 1);
