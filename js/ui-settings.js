@@ -7,6 +7,9 @@
     var W = state.canvas.width, H = state.canvas.height;
     var totalH = 0;
 
+    totalH += 88 + 35;
+    totalH += 60;
+
     totalH += 35 + 40;
     if (state.darknessEnabled) totalH += 60;
 
@@ -23,11 +26,18 @@
 
     totalH += 50 + 50;
 
+    var topMargin = 20;
     var maxScroll = Math.max(0, totalH - H + 200);
     state.settingsScrollY = Math.max(-maxScroll, Math.min(maxScroll, state.settingsScrollY));
 
-    var y = H / 2 - totalH / 2 + state.settingsScrollY;
-    var titleY = y - 60;
+    var y = (totalH <= H - topMargin * 2)
+      ? (H - totalH) / 2 + state.settingsScrollY
+      : topMargin + state.settingsScrollY;
+
+    var backBtn = { x: W / 2 - 140, y: y, w: 100, h: 88 };
+    y += 88 + 35;
+    var titleY = y + 30;
+    y += 60;
 
     var darknessLabelY = y;
     y += 35;
@@ -108,8 +118,6 @@
 
     y += 50;
     var startBtn = { x: W / 2 - 140, y: y, w: 280, h: 50 };
-
-    var backBtn = { x: 20, y: 20, w: 50, h: 44 };
 
     return {
       backBtn: backBtn,
@@ -372,7 +380,7 @@
     state.ctx.fill(); state.ctx.lineWidth = 2; state.ctx.stroke();
 
     state.ctx.fillStyle = '#fff';
-    state.ctx.font = 'bold 28px Arial';
+    state.ctx.font = 'bold 56px Arial';
     state.ctx.textAlign = 'center';
     state.ctx.textBaseline = 'middle';
     state.ctx.fillText('<', bb.x + bb.w / 2, bb.y + bb.h / 2 + 1);
