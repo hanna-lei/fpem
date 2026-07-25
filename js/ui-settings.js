@@ -5,9 +5,6 @@
 
   F.getSettingsLayout = function () {
     var W = state.canvas.width, H = state.canvas.height;
-    var backBtn = { x: W / 2 - 140, y: 20, w: 100, h: 88 };
-    var barBottom = backBtn.y + backBtn.h + 20;
-
     var totalH = 0;
 
     totalH += 60;
@@ -28,16 +25,18 @@
 
     totalH += 50 + 50;
 
-    var avail = H - barBottom;
-    var maxScroll = Math.max(0, totalH - avail + 200);
+    var topMargin = 30;
+    var maxScroll = Math.max(0, totalH - H + 200);
     state.settingsScrollY = Math.max(-maxScroll, Math.min(maxScroll, state.settingsScrollY));
 
-    var y = (totalH <= avail)
-      ? barBottom + (avail - totalH) / 2 + state.settingsScrollY
-      : barBottom + state.settingsScrollY;
+    var contentTop = (totalH <= H - topMargin * 2) ? (H - totalH) / 2 : topMargin;
+    var y = contentTop + state.settingsScrollY;
 
     var titleY = y + 30;
     y += 60;
+
+    var titleY0 = contentTop + 30;
+    var backBtn = { x: W / 2 - 240, y: titleY0 - 44, w: 100, h: 88 };
 
     var darknessLabelY = y;
     y += 35;
@@ -363,17 +362,6 @@
     state.ctx.fillText('Start', sr.x + sr.w / 2, sr.y + sr.h / 2);
 
     var bb = layout.backBtn;
-
-    var barH = bb.y + bb.h + 20;
-    state.ctx.fillStyle = '#1a1a2e';
-    state.ctx.fillRect(0, 0, W, barH);
-    state.ctx.strokeStyle = '#2f2f4a';
-    state.ctx.lineWidth = 2;
-    state.ctx.beginPath();
-    state.ctx.moveTo(0, barH);
-    state.ctx.lineTo(W, barH);
-    state.ctx.stroke();
-
     var backHovered = state.mouseX >= bb.x && state.mouseX <= bb.x + bb.w && state.mouseY >= bb.y && state.mouseY <= bb.y + bb.h;
     state.ctx.fillStyle = backHovered ? '#5a5a7e' : '#3a3a5e';
     state.ctx.strokeStyle = backHovered ? '#888' : '#666';
