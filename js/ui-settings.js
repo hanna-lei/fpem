@@ -26,17 +26,24 @@
     totalH += 50 + 50;
 
     var topMargin = 30;
-    var maxScroll = Math.max(0, totalH - H + 200);
-    state.settingsScrollY = Math.max(-maxScroll, Math.min(maxScroll, state.settingsScrollY));
+    var bottomMargin = 30;
+    var contentTop, maxScroll;
+    if (totalH <= H - topMargin - bottomMargin) {
+      contentTop = (H - totalH) / 2;
+      maxScroll = 0;
+    } else {
+      contentTop = topMargin;
+      maxScroll = contentTop + totalH - H + bottomMargin;
+    }
+    state.settingsScrollY = Math.max(-maxScroll, Math.min(0, state.settingsScrollY));
 
-    var contentTop = (totalH <= H - topMargin * 2) ? (H - totalH) / 2 : topMargin;
     var y = contentTop + state.settingsScrollY;
 
     var titleY = y + 30;
     y += 60;
 
     var titleY0 = contentTop + 30;
-    var backBtn = { x: W / 2 - 240, y: titleY0 - 44, w: 100, h: 88 };
+    var backBtn = { x: W / 2 - 340, y: titleY0 - 44, w: 100, h: 88 };
 
     var darknessLabelY = y;
     y += 35;
