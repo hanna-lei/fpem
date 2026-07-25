@@ -3,27 +3,104 @@
   var state = F.state;
   var B = F.B, CELL = F.CELL, WALL_W = F.WALL_W;
 
+  function placeToggle(x, y, width) {
+    var toggleW = 60, toggleH = 30;
+    return { x: x + (width - toggleW) / 2, y: y, w: toggleW, h: toggleH };
+  }
+
+  function placeSingleSlider(x, y, width) {
+    var sliderW = Math.min(200, width);
+    return { x: x + (width - sliderW) / 2, y: y, w: sliderW, h: 10 };
+  }
+
+  function layoutSettingBlock(x, y, width, options) {
+    var block = {
+      labelY: y,
+      toggle: null,
+      descY: null,
+      slider: null,
+      sliders: null,
+      sliderTextY: null,
+      height: 0
+    };
+    var cy = y + 35;
+    block.toggle = placeToggle(x, cy, width);
+    cy += 40;
+
+    if (options.hasDesc) {
+      block.descY = cy;
+      cy += 25;
+    }
+
+    if (options.enabled) {
+      if (options.sliderCount > 0) {
+        cy += 10;
+        var sliderLayout = F.layoutSliders(x, cy, width, options.sliderCount, options.verticalSliders);
+        block.sliders = sliderLayout.sliders;
+        block.sliderTextY = sliderLayout.textY;
+        cy += sliderLayout.blockH;
+      } else {
+        cy += 10;
+        block.slider = placeSingleSlider(x, cy, width);
+        cy += 30;
+        block.sliderTextY = cy;
+        cy += 20;
+      }
+    }
+
+    block.height = cy - y + (options.bottomGap || 20);
+    return block;
+  }
+
   F.getSettingsLayout = function () {
     var W = state.canvas.width, H = state.canvas.height;
-    var totalH = 0;
+    var padding = F.getUiPadding(W);
+    var contentW = W - 2 * padding;
+    var cols = F.getUiColumns(W, 2);
+    var colGap = 24;
+    var settingsColW = cols === 1 ? contentW : Math.min(240, Math.floor((contentW - colGap) / 2));
+    var settingsGridW = cols === 1 ? settingsColW : settingsColW * 2 + colGap;
+    var settingsGridX = padding + (contentW - settingsGridW) / 2;
+    var colW = settingsColW;
+    var verticalItemSliders = cols === 1 || settingsGridW < 520;
+    var itemSliderCount = state.darknessEnabled ? 4 : 3;
 
-    totalH += 60;
+    var darknessOpts = {
+      hasDesc: true,
+      enabled: state.darknessEnabled,
+      sliderCount: state.darknessEnabled ? 1 : 0,
+      verticalSliders: false,
+      bottomGap: 20
+    };
+    var assignmentsOpts = {
+      enabled: state.assignmentsEnabled,
+      sliderCount: 0,
+      verticalSliders: false,
+      bottomGap: 20
+    };
+    var itemsOpts = {
+      enabled: state.itemsEnabled,
+      sliderCount: state.itemsEnabled ? itemSliderCount : 0,
+      verticalSliders: verticalItemSliders,
+      bottomGap: 20
+    };
+    var lockersOpts = {
+      enabled: state.lockersEnabled,
+      sliderCount: 0,
+      verticalSliders: false,
+      bottomGap: 20
+    };
 
-    totalH += 35 + 40;
-    if (state.darknessEnabled) totalH += 60;
+    var darknessH = layoutSettingBlock(0, 0, colW, darknessOpts).height;
+    var assignmentsH = layoutSettingBlock(0, 0, colW, assignmentsOpts).height;
+    var itemsH = layoutSettingBlock(0, 0, colW, itemsOpts).height;
+    var lockersH = layoutSettingBlock(0, 0, colW, lockersOpts).height;
 
-    totalH += 50 + 35;
-    if (state.itemsEnabled) totalH += 70;
-
-    totalH += 50 + 35;
-    if (state.assignmentsEnabled) totalH += 70;
-
-    totalH += 50 + 35;
-    if (state.lockersEnabled) totalH += 70;
-
-    totalH += 50 + 35 + 60;
-
-    totalH += 50 + 50;
+    var row1H = cols === 1 ? darknessH + assignmentsH : Math.max(darknessH, assignmentsH);
+    var row2H = cols === 1 ? itemsH + lockersH : Math.max(itemsH, lockersH);
+    var mapBlockH = 35 + 35 + 25 + 50;
+    var headerH = 75;
+    var totalH = headerH + row1H + row2H + mapBlockH + 50;
 
     var topMargin = 30;
     var bottomMargin = 30;
@@ -38,102 +115,74 @@
     state.settingsScrollY = Math.max(-maxScroll, Math.min(0, state.settingsScrollY));
 
     var y = contentTop + state.settingsScrollY;
+    var titleY0 = contentTop + 22;
+    var titleY = y + 22;
+    y += headerH;
 
-    var titleY = y + 30;
-    y += 60;
+    var backBtn = {
+      x: settingsGridX,
+      y: titleY0 - 25,
+      w: 56,
+      h: 50
+    };
 
-    var titleY0 = contentTop + 30;
-    var backBtn = { x: W / 2 - 340, y: titleY0 - 25, w: 56, h: 50 };
+    var darknessX = settingsGridX;
+    var assignmentsX = cols === 1 ? settingsGridX : settingsGridX + settingsColW + colGap;
+    var itemsX = settingsGridX;
+    var lockersX = cols === 1 ? settingsGridX : settingsGridX + settingsColW + colGap;
 
-    var darknessLabelY = y;
-    y += 35;
-    var darknessToggle = { x: W / 2 - 30, y: y, w: 60, h: 30 };
-    y += 40;
-    var darknessDescY = y;
+    var darknessY = y;
+    var assignmentsY = cols === 1 ? darknessY + darknessH : y;
+    var row2Y = y + row1H;
+    var itemsY = row2Y;
+    var lockersY = cols === 1 ? itemsY + itemsH : row2Y;
 
-    var darknessSlider = null;
-    var darknessSliderTextY = null;
-    if (state.darknessEnabled) {
-      y += 30;
-      darknessSlider = { x: W / 2 - 100, y: y, w: 200, h: 10 };
-      y += 30;
-      darknessSliderTextY = y;
-    }
+    var darkness = layoutSettingBlock(darknessX, darknessY, colW, darknessOpts);
+    var assignments = layoutSettingBlock(assignmentsX, assignmentsY, colW, assignmentsOpts);
+    var items = layoutSettingBlock(itemsX, itemsY, colW, itemsOpts);
+    var lockers = layoutSettingBlock(lockersX, lockersY, colW, lockersOpts);
 
-    y += 50;
-    var itemsLabelY = y;
-    y += 35;
-    var itemsToggle = { x: W / 2 - 30, y: y, w: 60, h: 30 };
+    var mapY = row2Y + row2H;
+    var mapSizeLabelY = mapY;
+    mapY += 35;
+    var mapSlider = placeSingleSlider(settingsGridX, mapY, settingsGridW);
+    mapY += 25;
+    var mapSliderTextY = mapY;
+    mapY += 50;
 
-    var itemSliders = null;
-    var itemSlidersTextY = null;
-    if (state.itemsEnabled) {
-      y += 40;
-      if (state.darknessEnabled) {
-        itemSliders = [
-          { x: W / 2 - 200, y: y, w: 80, h: 10 },
-          { x: W / 2 - 100, y: y, w: 80, h: 10 },
-          { x: W / 2 + 0, y: y, w: 80, h: 10 },
-          { x: W / 2 + 100, y: y, w: 80, h: 10 }
-        ];
-      } else {
-        itemSliders = [
-          { x: W / 2 - 170, y: y, w: 100, h: 10 },
-          { x: W / 2 - 50, y: y, w: 100, h: 10 },
-          { x: W / 2 + 70, y: y, w: 100, h: 10 }
-        ];
-      }
-      y += 30;
-      itemSlidersTextY = y;
-    }
-
-    y += 50;
-    var assignmentsLabelY = y;
-    y += 35;
-    var assignmentsToggle = { x: W / 2 - 30, y: y, w: 60, h: 30 };
-
-    var assignmentSlider = null;
-    var assignmentSliderTextY = null;
-    if (state.assignmentsEnabled) {
-      y += 40;
-      assignmentSlider = { x: W / 2 - 50, y: y, w: 100, h: 10 };
-      y += 30;
-      assignmentSliderTextY = y;
-    }
-
-    y += 50;
-    var lockersLabelY = y;
-    y += 35;
-    var lockersToggle = { x: W / 2 - 30, y: y, w: 60, h: 30 };
-
-    var lockerSlider = null;
-    var lockerSliderTextY = null;
-    if (state.lockersEnabled) {
-      y += 40;
-      lockerSlider = { x: W / 2 - 50, y: y, w: 100, h: 10 };
-      y += 30;
-      lockerSliderTextY = y;
-    }
-
-    y += 50;
-    var mapSizeLabelY = y;
-    y += 35;
-    var mapSlider = { x: W / 2 - 100, y: y, w: 200, h: 10 };
-    y += 25;
-    var mapSliderTextY = y;
-
-    y += 50;
-    var startBtn = { x: W / 2 - 140, y: y, w: 280, h: 50 };
+    var startBtnW = Math.min(280, settingsGridW);
+    var startBtn = {
+      x: settingsGridX + (settingsGridW - startBtnW) / 2,
+      y: mapY,
+      w: startBtnW,
+      h: 50
+    };
 
     return {
       backBtn: backBtn,
       titleY: titleY,
-      darknessLabelY: darknessLabelY, darknessToggle: darknessToggle, darknessDescY: darknessDescY, darknessSlider: darknessSlider, darknessSliderTextY: darknessSliderTextY,
-      itemsLabelY: itemsLabelY, itemsToggle: itemsToggle, itemSliders: itemSliders, itemSlidersTextY: itemSlidersTextY,
-      assignmentsLabelY: assignmentsLabelY, assignmentsToggle: assignmentsToggle, assignmentSlider: assignmentSlider, assignmentSliderTextY: assignmentSliderTextY,
-      lockersLabelY: lockersLabelY, lockersToggle: lockersToggle, lockerSlider: lockerSlider, lockerSliderTextY: lockerSliderTextY,
-      mapSizeLabelY: mapSizeLabelY, mapSlider: mapSlider, mapSliderTextY: mapSliderTextY,
-      startBtn: startBtn
+      darknessLabelY: darkness.labelY,
+      darknessToggle: darkness.toggle,
+      darknessDescY: darkness.descY,
+      darknessSlider: darkness.sliders ? darkness.sliders[0] : darkness.slider,
+      darknessSliderTextY: darkness.sliderTextY,
+      itemsLabelY: items.labelY,
+      itemsToggle: items.toggle,
+      itemSliders: items.sliders,
+      itemSlidersTextY: items.sliderTextY,
+      assignmentsLabelY: assignments.labelY,
+      assignmentsToggle: assignments.toggle,
+      assignmentSlider: assignments.slider,
+      assignmentSliderTextY: assignments.sliderTextY,
+      lockersLabelY: lockers.labelY,
+      lockersToggle: lockers.toggle,
+      lockerSlider: lockers.slider,
+      lockerSliderTextY: lockers.sliderTextY,
+      mapSizeLabelY: mapSizeLabelY,
+      mapSlider: mapSlider,
+      mapSliderTextY: mapSliderTextY,
+      startBtn: startBtn,
+      itemSlidersVertical: verticalItemSliders
     };
   };
 
@@ -148,12 +197,12 @@
     var layout = F.getSettingsLayout();
 
     state.ctx.fillStyle = '#f0e6d3';
-    state.ctx.font = 'bold 36px Arial';
+    state.ctx.font = W < 560 ? 'bold 28px Arial' : 'bold 36px Arial';
     state.ctx.fillText('Game Settings', W / 2, layout.titleY);
 
     state.ctx.fillStyle = '#fff';
     state.ctx.font = 'bold 22px Arial';
-    state.ctx.fillText('Darkness', W / 2, layout.darknessLabelY);
+    state.ctx.fillText('Darkness', layout.darknessToggle.x + layout.darknessToggle.w / 2, layout.darknessLabelY);
 
     var dtog = layout.darknessToggle;
     state.ctx.fillStyle = state.darknessEnabled ? '#4caf50' : '#555';
@@ -172,7 +221,11 @@
 
     state.ctx.fillStyle = '#aaa';
     state.ctx.font = '16px Arial';
-    state.ctx.fillText(state.darknessEnabled ? 'The maze will be shrouded in darkness.' : 'Normal visibility.', W / 2, layout.darknessDescY);
+    state.ctx.fillText(
+      state.darknessEnabled ? 'The maze will be shrouded in darkness.' : 'Normal visibility.',
+      layout.darknessToggle.x + layout.darknessToggle.w / 2,
+      layout.darknessDescY
+    );
 
     if (state.darknessEnabled && layout.darknessSlider) {
       var slr = layout.darknessSlider;
@@ -192,12 +245,12 @@
 
       state.ctx.fillStyle = '#aaa';
       state.ctx.font = '14px Arial';
-      state.ctx.fillText('Light amount: ' + state.darknessRadiusTiles + ' tiles', W / 2, layout.darknessSliderTextY);
+      state.ctx.fillText('Light amount: ' + state.darknessRadiusTiles + ' tiles', slr.x + slr.w / 2, layout.darknessSliderTextY);
     }
 
     state.ctx.fillStyle = '#fff';
     state.ctx.font = 'bold 22px Arial';
-    state.ctx.fillText('Assignments', W / 2, layout.assignmentsLabelY);
+    state.ctx.fillText('Assignments', layout.assignmentsToggle.x + layout.assignmentsToggle.w / 2, layout.assignmentsLabelY);
 
     var atog = layout.assignmentsToggle;
     state.ctx.fillStyle = state.assignmentsEnabled ? '#4caf50' : '#555';
@@ -239,7 +292,7 @@
 
     state.ctx.fillStyle = '#fff';
     state.ctx.font = 'bold 22px Arial';
-    state.ctx.fillText('Items', W / 2, layout.itemsLabelY);
+    state.ctx.fillText('Items', layout.itemsToggle.x + layout.itemsToggle.w / 2, layout.itemsLabelY);
 
     var itog = layout.itemsToggle;
     state.ctx.fillStyle = state.itemsEnabled ? '#4caf50' : '#555';
@@ -279,13 +332,14 @@
 
         state.ctx.fillStyle = '#aaa';
         state.ctx.font = '14px Arial';
-        state.ctx.fillText(labels[i] + ': ' + counts[i], isl.x + isl.w / 2, layout.itemSlidersTextY);
+        var labelY = layout.itemSlidersVertical ? isl.y + 30 : layout.itemSlidersTextY;
+        state.ctx.fillText(labels[i] + ': ' + counts[i], isl.x + isl.w / 2, labelY);
       }
     }
 
     state.ctx.fillStyle = '#fff';
     state.ctx.font = 'bold 22px Arial';
-    state.ctx.fillText('Lockers', W / 2, layout.lockersLabelY);
+    state.ctx.fillText('Lockers', layout.lockersToggle.x + layout.lockersToggle.w / 2, layout.lockersLabelY);
 
     var ltog = layout.lockersToggle;
     state.ctx.fillStyle = state.lockersEnabled ? '#4caf50' : '#555';
@@ -345,7 +399,8 @@
     var gridSz = Math.floor((state.mapSize - 2 * B - WALL_W) / CELL);
     state.ctx.fillStyle = '#aaa';
     state.ctx.font = '14px Arial';
-    state.ctx.fillText(state.mapSize + ' tiles (' + gridSz + '×' + gridSz + ' grid, ' + F.getTargetDeadEnds(state.mapSize) + ' dead ends)', W / 2, layout.mapSliderTextY);
+    var mapText = state.mapSize + ' tiles (' + gridSz + '×' + gridSz + ' grid, ' + F.getTargetDeadEnds(state.mapSize) + ' dead ends)';
+    state.ctx.fillText(mapText, W / 2, layout.mapSliderTextY);
 
     var sr = layout.startBtn;
     var isHovered = state.mouseX >= sr.x && state.mouseX <= sr.x + sr.w && state.mouseY >= sr.y && state.mouseY <= sr.y + sr.h;

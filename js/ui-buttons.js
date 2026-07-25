@@ -2,21 +2,27 @@
   var F = window.FPEM;
   var state = F.state;
 
+  F.getMenuTitleBottomY = function () {
+    var W = state.canvas.width;
+    if (W < 560) return 120;
+    if (W < 800) return 145;
+    return 165;
+  };
+
   F.getButtonRects = function () {
     var W = state.canvas.width, H = state.canvas.height;
-    var btnW = 280, btnH = 50, gap = 18;
-    var titleBottomY = 165;
-    var totalH = state.menuButtons.length * btnH + (state.menuButtons.length - 1) * gap;
-    var startY = titleBottomY + (H - titleBottomY - totalH) / 2;
-    return state.menuButtons.map(function (btn, i) {
-      return {
-        x: W / 2 - btnW / 2,
-        y: startY + i * (btnH + gap),
-        w: btnW,
-        h: btnH,
-        label: btn.label,
-        active: btn.active
-      };
+    var btnH = 50, gap = 18;
+    var cols = F.getUiColumns(W, 2);
+    var titleBottomY = F.getMenuTitleBottomY();
+    var rows = Math.ceil(state.menuButtons.length / cols);
+    var totalH = rows * btnH + (rows - 1) * gap;
+    var startY = titleBottomY + Math.max(20, (H - titleBottomY - totalH) / 2);
+    return F.layoutButtonGrid(state.menuButtons, W, H, {
+      startY: startY,
+      btnH: btnH,
+      gap: gap,
+      maxCols: 2,
+      maxBtnW: 280
     });
   };
 
@@ -31,22 +37,18 @@
 
   F.getEndGameButtonRects = function () {
     var W = state.canvas.width, H = state.canvas.height;
-    var btnW = 280, btnH = 50, gap = 18;
-    var startY = H / 2 + 55;
+    var btnH = 50, gap = 18;
     var buttons = [
       { label: 'New Round', active: true },
       { label: 'Game Settings', active: true },
       { label: 'Main Menu', active: true }
     ];
-    return buttons.map(function (btn, i) {
-      return {
-        x: W / 2 - btnW / 2,
-        y: startY + i * (btnH + gap),
-        w: btnW,
-        h: btnH,
-        label: btn.label,
-        active: btn.active
-      };
+    return F.layoutButtonGrid(buttons, W, H, {
+      startY: H / 2 + 55,
+      btnH: btnH,
+      gap: gap,
+      maxCols: 2,
+      maxBtnW: 280
     });
   };
 

@@ -10,13 +10,19 @@
     state.ctx.textAlign = 'center';
     state.ctx.textBaseline = 'middle';
 
+    var padding = F.getUiPadding(W);
+    var titleY = W < 560 ? 52 : W < 800 ? 62 : 70;
+    var subtitleY = W < 560 ? 92 : W < 800 ? 112 : 130;
+    var titleFont = W < 400 ? 'bold 22px Arial' : W < 560 ? 'bold 28px Arial' : W < 800 ? 'bold 36px Arial' : 'bold 42px Arial';
+    var subtitleFont = W < 560 ? 'bold 40px Arial' : W < 800 ? 'bold 48px Arial' : 'bold 56px Arial';
+
     state.ctx.fillStyle = '#f0e6d3';
-    state.ctx.font = 'bold 42px Arial';
-    state.ctx.fillText('Fundamental Paper Education', W / 2, 70);
+    state.ctx.font = titleFont;
+    state.ctx.fillText('Fundamental Paper Education', W / 2, titleY, W - 2 * padding);
 
     state.ctx.fillStyle = '#ffffff';
-    state.ctx.font = 'bold 56px Arial';
-    state.ctx.fillText('MAZE', W / 2, 130);
+    state.ctx.font = subtitleFont;
+    state.ctx.fillText('MAZE', W / 2, subtitleY);
 
     var rects = F.getButtonRects();
     var hovered = F.getHoveredButton();
