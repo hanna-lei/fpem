@@ -197,11 +197,11 @@
     var layout = F.getSettingsLayout();
 
     state.ctx.fillStyle = '#f0e6d3';
-    state.ctx.font = W < 560 ? 'bold 28px Arial' : 'bold 36px Arial';
+    state.ctx.font = W < 560 ? 'bold 28px "Barrio", cursive' : 'bold 36px "Barrio", cursive';
     state.ctx.fillText('Game Settings', W / 2, layout.titleY);
 
     state.ctx.fillStyle = '#fff';
-    state.ctx.font = 'bold 22px Arial';
+    state.ctx.font = 'bold 22px "Barrio", cursive';
     state.ctx.fillText('Darkness', layout.darknessToggle.x + layout.darknessToggle.w / 2, layout.darknessLabelY);
 
     var dtog = layout.darknessToggle;
@@ -220,7 +220,7 @@
     state.ctx.fill();
 
     state.ctx.fillStyle = '#aaa';
-    state.ctx.font = '16px Arial';
+    state.ctx.font = '16px "Barrio", cursive';
     state.ctx.fillText(
       state.darknessEnabled ? 'The maze will be shrouded in darkness.' : 'Normal visibility.',
       layout.darknessToggle.x + layout.darknessToggle.w / 2,
@@ -244,12 +244,12 @@
       state.ctx.fill();
 
       state.ctx.fillStyle = '#aaa';
-      state.ctx.font = '14px Arial';
+      state.ctx.font = '14px "Barrio", cursive';
       state.ctx.fillText('Light amount: ' + state.darknessRadiusTiles + ' tiles', slr.x + slr.w / 2, layout.darknessSliderTextY);
     }
 
     state.ctx.fillStyle = '#fff';
-    state.ctx.font = 'bold 22px Arial';
+    state.ctx.font = 'bold 22px "Barrio", cursive';
     state.ctx.fillText('Assignments', layout.assignmentsToggle.x + layout.assignmentsToggle.w / 2, layout.assignmentsLabelY);
 
     var atog = layout.assignmentsToggle;
@@ -286,12 +286,12 @@
       state.ctx.fill();
 
       state.ctx.fillStyle = '#aaa';
-      state.ctx.font = '14px Arial';
+      state.ctx.font = '14px "Barrio", cursive';
       state.ctx.fillText('Assignments: ' + state.assignmentCount + ' / ' + maxAssignments, aslr.x + aslr.w / 2, layout.assignmentSliderTextY);
     }
 
     state.ctx.fillStyle = '#fff';
-    state.ctx.font = 'bold 22px Arial';
+    state.ctx.font = 'bold 22px "Barrio", cursive';
     state.ctx.fillText('Items', layout.itemsToggle.x + layout.itemsToggle.w / 2, layout.itemsLabelY);
 
     var itog = layout.itemsToggle;
@@ -331,14 +331,14 @@
         state.ctx.fill();
 
         state.ctx.fillStyle = '#aaa';
-        state.ctx.font = '14px Arial';
+        state.ctx.font = '14px "Barrio", cursive';
         var labelY = layout.itemSlidersVertical ? isl.y + 30 : layout.itemSlidersTextY;
         state.ctx.fillText(labels[i] + ': ' + counts[i], isl.x + isl.w / 2, labelY);
       }
     }
 
     state.ctx.fillStyle = '#fff';
-    state.ctx.font = 'bold 22px Arial';
+    state.ctx.font = 'bold 22px "Barrio", cursive';
     state.ctx.fillText('Lockers', layout.lockersToggle.x + layout.lockersToggle.w / 2, layout.lockersLabelY);
 
     var ltog = layout.lockersToggle;
@@ -373,12 +373,12 @@
       state.ctx.fill();
 
       state.ctx.fillStyle = '#aaa';
-      state.ctx.font = '14px Arial';
+      state.ctx.font = '14px "Barrio", cursive';
       state.ctx.fillText('Lockers: ' + state.lockerCount, lslr.x + lslr.w / 2, layout.lockerSliderTextY);
     }
 
     state.ctx.fillStyle = '#fff';
-    state.ctx.font = 'bold 22px Arial';
+    state.ctx.font = 'bold 22px "Barrio", cursive';
     state.ctx.fillText('Map Size', W / 2, layout.mapSizeLabelY);
 
     var mslr = layout.mapSlider;
@@ -398,7 +398,7 @@
 
     var gridSz = Math.floor((state.mapSize - 2 * B - WALL_W) / CELL);
     state.ctx.fillStyle = '#aaa';
-    state.ctx.font = '14px Arial';
+    state.ctx.font = '14px "Barrio", cursive';
     var mapText = state.mapSize + ' tiles (' + gridSz + '×' + gridSz + ' grid, ' + F.getTargetDeadEnds(state.mapSize) + ' dead ends)';
     state.ctx.fillText(mapText, W / 2, layout.mapSliderTextY);
 
@@ -420,7 +420,7 @@
     state.ctx.fill(); state.ctx.lineWidth = 2; state.ctx.stroke();
 
     state.ctx.fillStyle = '#fff';
-    state.ctx.font = 'bold 22px Arial';
+    state.ctx.font = 'bold 22px "Barrio", cursive';
     state.ctx.fillText('Start', sr.x + sr.w / 2, sr.y + sr.h / 2);
 
     var bb = layout.backBtn;
@@ -441,7 +441,7 @@
     state.ctx.fill(); state.ctx.lineWidth = 2; state.ctx.stroke();
 
     state.ctx.fillStyle = '#fff';
-    state.ctx.font = 'bold 30px Arial';
+    state.ctx.font = 'bold 30px "Barrio", cursive';
     state.ctx.textAlign = 'center';
     state.ctx.textBaseline = 'middle';
     state.ctx.fillText('<', bb.x + bb.w / 2, bb.y + bb.h / 2 + 1);

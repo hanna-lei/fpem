@@ -9,6 +9,14 @@
   var PW = F.PW;
   var T = F.T;
 
+  // Eagerly load the Barrio web font so canvas text renders in it without a
+  // fallback flash. The render loop redraws every frame, so it picks up the
+  // font as soon as the download resolves.
+  if (document.fonts && document.fonts.load) {
+    document.fonts.load('16px "Barrio"');
+    document.fonts.load('bold 16px "Barrio"');
+  }
+
   function resize() {
     state.canvas.width = window.innerWidth;
     state.canvas.height = window.innerHeight;
