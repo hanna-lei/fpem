@@ -28,7 +28,7 @@
   F.flashlightImg = new Image();
   F.flashlightImg.src = 'imgs/flashlight.png';
   F.menuBgImg = new Image();
-  F.menuBgImg.src = 'imgs/fpebg.webp';
+  F.menuBgImg.src = 'imgs/fpebgquality.png';
   F.ENEMY_VARIANTS = [
     {
       name: 'Miss Circle',
