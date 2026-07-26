@@ -90,7 +90,8 @@
       { label: 'Play', active: false },
       { label: 'Randomize', active: true },
       { label: 'Characters', active: false },
-      { label: 'Info', active: false }
+      { label: 'Info', active: false },
+      { label: 'Achievements', active: false }
     ],
     mouseX: 0,
     mouseY: 0,
