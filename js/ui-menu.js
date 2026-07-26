@@ -20,8 +20,8 @@
     var padding = F.getUiPadding(W);
     var titleY = W < 560 ? 52 : W < 800 ? 62 : 70;
     var subtitleY = W < 560 ? 92 : W < 800 ? 112 : 130;
-    var titleFont = W < 400 ? 'bold 22px Arial' : W < 560 ? 'bold 28px Arial' : W < 800 ? 'bold 36px Arial' : 'bold 42px Arial';
-    var subtitleFont = W < 560 ? 'bold 40px Arial' : W < 800 ? 'bold 48px Arial' : 'bold 56px Arial';
+    var titleFont = W < 400 ? 'bold 22px "Barrio", cursive' : W < 560 ? 'bold 28px "Barrio", cursive' : W < 800 ? 'bold 36px "Barrio", cursive' : 'bold 42px "Barrio", cursive';
+    var subtitleFont = W < 560 ? 'bold 40px "Barrio", cursive' : W < 800 ? 'bold 48px "Barrio", cursive' : 'bold 56px "Barrio", cursive';
 
     state.ctx.save();
     state.ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';

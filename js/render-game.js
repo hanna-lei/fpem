@@ -40,7 +40,7 @@
       state.ctx.globalAlpha = 1;
 
       state.ctx.fillStyle = '#fff';
-      state.ctx.font = 'bold 18px Arial';
+      state.ctx.font = 'bold 18px "Barrio", cursive';
       state.ctx.textAlign = 'center';
       state.ctx.textBaseline = 'middle';
       state.ctx.fillText('EXIT', exSX, exSY);
@@ -50,7 +50,7 @@
     state.ctx.fillStyle = 'rgba(100,149,237,0.2)';
     state.ctx.beginPath(); state.ctx.arc(stSX, stSY, state.exitR, 0, Math.PI * 2); state.ctx.fill();
     state.ctx.fillStyle = '#6495ED';
-    state.ctx.font = '13px Arial';
+    state.ctx.font = '13px "Barrio", cursive';
     state.ctx.textAlign = 'center';
     state.ctx.textBaseline = 'middle';
     state.ctx.fillText('START', stSX, stSY);
@@ -126,7 +126,7 @@
         state.ctx.fillRect(locker.x - camX, locker.y - camY, locker.w, locker.h);
       } else if (state.playerInLocker && li === state.activeLockerIndex) {
         state.ctx.fillStyle = '#fff';
-        state.ctx.font = 'bold 20px Arial';
+        state.ctx.font = 'bold 20px "Barrio", cursive';
         state.ctx.textAlign = 'center';
         state.ctx.textBaseline = 'bottom';
         state.ctx.fillText(String(Math.ceil(state.lockerTimer)), locker.x + locker.w / 2 - camX, locker.y - camY - 5);
@@ -191,7 +191,7 @@
       if (state.invincible) {
         var countNum = Math.ceil(Math.max.apply(null, state.invincibleTimers));
         state.ctx.fillStyle = '#ffdd00';
-        state.ctx.font = 'bold 22px Arial';
+        state.ctx.font = 'bold 22px "Barrio", cursive';
         state.ctx.textAlign = 'center';
         state.ctx.textBaseline = 'bottom';
         state.ctx.fillText(String(countNum), ppx, ppy - phh - 8);
@@ -202,7 +202,7 @@
         var spinSpeed = Date.now() / 300;
         var starCount = 5;
         var haloRadius = 20;
-        state.ctx.font = '14px Arial'; state.ctx.textAlign = 'center'; state.ctx.textBaseline = 'middle';
+        state.ctx.font = '14px "Barrio", cursive'; state.ctx.textAlign = 'center'; state.ctx.textBaseline = 'middle';
         for (var si = 0; si < starCount; si++) {
           var angle = spinSpeed + (si * Math.PI * 2 / starCount);
           var ssx = ppx + Math.cos(angle) * haloRadius;
@@ -241,7 +241,7 @@
     }
 
     state.ctx.fillStyle = '#fff';
-    state.ctx.font = '16px Arial';
+    state.ctx.font = '16px "Barrio", cursive';
     state.ctx.textAlign = 'left';
     state.ctx.textBaseline = 'top';
     state.ctx.fillText('⏱ ' + state.elapsed + 's', 15, 15);
@@ -300,7 +300,7 @@
       var secsLeft = Math.max(0, Math.ceil(ENEMY_SPAWN_DELAY - elapsedSec));
       if (secsLeft > 0) {
         state.ctx.fillStyle = state.enemyVariant.body;
-        state.ctx.font = 'bold 20px Arial';
+        state.ctx.font = 'bold 20px "Barrio", cursive';
         state.ctx.textAlign = 'center';
         state.ctx.fillText('⚠️ ' + state.enemyVariant.name.toUpperCase() + ' ENTERS IN ' + secsLeft + '...', W / 2, 60);
       }
@@ -308,12 +308,12 @@
 
     if (state.assignmentTeacherStunTimer > 0) {
       state.ctx.fillStyle = '#88d8ff';
-      state.ctx.font = 'bold 18px Arial';
+      state.ctx.font = 'bold 18px "Barrio", cursive';
       state.ctx.textAlign = 'center';
       state.ctx.fillText('TEACHER STUNNED: ' + Math.ceil(state.assignmentTeacherStunTimer), W / 2, 88);
     } else if (state.assignmentTeacherBoostTimer > 0) {
       state.ctx.fillStyle = '#ff7777';
-      state.ctx.font = 'bold 18px Arial';
+      state.ctx.font = 'bold 18px "Barrio", cursive';
       state.ctx.textAlign = 'center';
       state.ctx.fillText('TEACHER BOOSTED: ' + Math.ceil(state.assignmentTeacherBoostTimer), W / 2, 88);
     }
@@ -321,7 +321,7 @@
     if (state.assignments.length > 0 && state.gameState === 'playing') {
       var assignmentsLeft = F.remainingAssignments ? F.remainingAssignments() : 0;
       state.ctx.fillStyle = '#ff3333';
-      state.ctx.font = 'bold 22px Arial';
+      state.ctx.font = 'bold 22px "Barrio", cursive';
       state.ctx.textAlign = 'center';
       state.ctx.textBaseline = 'top';
       state.ctx.fillText(assignmentsLeft > 0 ? assignmentsLeft + ' assignment(s) remaining!' : 'Find the exit!', W / 2, 12);
@@ -343,11 +343,11 @@
       state.ctx.fillStyle = '#222';
       state.ctx.textAlign = 'center';
       state.ctx.textBaseline = 'middle';
-      state.ctx.font = 'bold 24px Arial';
+      state.ctx.font = 'bold 24px "Barrio", cursive';
       state.ctx.fillText('Assignment', W / 2, panelY + 36);
-      state.ctx.font = 'bold 44px Arial';
+      state.ctx.font = 'bold 44px "Barrio", cursive';
       state.ctx.fillText(state.assignmentA + ' × ' + state.assignmentB + ' = ?', W / 2, panelY + 95);
-      state.ctx.font = 'bold 32px Arial';
+      state.ctx.font = 'bold 32px "Barrio", cursive';
       state.ctx.fillText(state.assignmentAnswer || '_', W / 2, panelY + 145);
 
       var qbarX = panelX + 50, qbarY = panelY + panelH - 42, qbarW = panelW - 100, qbarH = 12;
@@ -364,9 +364,9 @@
     if (state.gameState === 'won') {
       state.ctx.fillStyle = 'rgba(0,0,0,0.75)'; state.ctx.fillRect(0, 0, W, H);
       state.ctx.textAlign = 'center'; state.ctx.textBaseline = 'middle';
-      state.ctx.fillStyle = '#4caf50'; state.ctx.font = 'bold 52px Arial';
+      state.ctx.fillStyle = '#4caf50'; state.ctx.font = 'bold 52px "Barrio", cursive';
       state.ctx.fillText('🎉 YOU WIN! 🎉', W / 2, H / 2 - 30);
-      state.ctx.fillStyle = '#fff'; state.ctx.font = '24px Arial';
+      state.ctx.fillStyle = '#fff'; state.ctx.font = '24px "Barrio", cursive';
       state.ctx.fillText('Escaped ' + state.enemyVariant.name + ' in ' + state.elapsed + ' seconds!', W / 2, H / 2 + 25);
       var rectsW = F.getEndGameButtonRects();
       var hoveredW = F.getHoveredEndGameButton();
@@ -376,9 +376,9 @@
     if (state.gameState === 'lost') {
       state.ctx.fillStyle = 'rgba(80,0,0,0.8)'; state.ctx.fillRect(0, 0, W, H);
       state.ctx.textAlign = 'center'; state.ctx.textBaseline = 'middle';
-      state.ctx.fillStyle = state.enemyVariant.body; state.ctx.font = 'bold 52px Arial';
+      state.ctx.fillStyle = state.enemyVariant.body; state.ctx.font = 'bold 52px "Barrio", cursive';
       state.ctx.fillText('💀 ' + state.enemyVariant.name.toUpperCase() + '! 💀', W / 2, H / 2 - 30);
-      state.ctx.fillStyle = '#fff'; state.ctx.font = '24px Arial';
+      state.ctx.fillStyle = '#fff'; state.ctx.font = '24px "Barrio", cursive';
       state.ctx.fillText('Caught after ' + state.elapsed + ' seconds', W / 2, H / 2 + 25);
       var rectsL = F.getEndGameButtonRects();
       var hoveredL = F.getHoveredEndGameButton();

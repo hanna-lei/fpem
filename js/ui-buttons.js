@@ -89,12 +89,12 @@
       state.ctx.stroke();
 
       state.ctx.fillStyle = isActive ? '#fff' : '#666';
-      state.ctx.font = 'bold 22px Arial';
+      state.ctx.font = 'bold 22px "Barrio", cursive';
       state.ctx.fillText(r.label, r.x + r.w / 2, r.y + r.h / 2);
 
       if (!isActive) {
         state.ctx.fillStyle = '#555';
-        state.ctx.font = '12px Arial';
+        state.ctx.font = '12px "Barrio", cursive';
         state.ctx.fillText('coming soon', r.x + r.w / 2, r.y + r.h / 2 + 18);
       }
     }
