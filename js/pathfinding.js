@@ -81,10 +81,22 @@
       var finalTargetIdx = targetIdx;
 
       for (var k = Math.min(path.length - 1, targetIdx + MAX_SKIP); k > targetIdx; k--) {
-        if (F.hasLineOfSight(state.enemy.x, state.enemy.y, path[k].x, path[k].y, hw, hh)) {
+        if (!isBehindEnemy(path[k].x, path[k].y) &&
+          F.hasLineOfSight(state.enemy.x, state.enemy.y, path[k].x, path[k].y, hw, hh)) {
           finalTargetIdx = k;
           break;
         }
+      }
+
+      // Never head toward a waypoint that sits behind the enemy: doing so makes
+      // the teacher briefly run the opposite way before resuming the chase (the
+      // BFS path starts at the enemy's own cell center, which is behind it once
+      // it has moved past that center). Advance to the next waypoint instead.
+      // The last waypoint (the player) is always kept, so the enemy still turns
+      // around to chase a player who doubled back.
+      while (finalTargetIdx < path.length - 1 &&
+        isBehindEnemy(path[finalTargetIdx].x, path[finalTargetIdx].y)) {
+        finalTargetIdx++;
       }
 
       state.enemyWaypoints = path;
