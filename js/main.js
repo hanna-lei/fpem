@@ -24,6 +24,28 @@
   resize();
   window.addEventListener('resize', resize);
 
+  // Zooming is disabled everywhere (menu and gameplay). The game is a fixed,
+  // full-viewport canvas, so browser zoom only ever breaks the layout. The
+  // viewport meta tag and `touch-action: none` cover pinch/double-tap zoom on
+  // touch devices; the listeners below cover the desktop zoom paths.
+  window.addEventListener('wheel', function (e) {
+    // Ctrl+wheel zooms the page, and browsers report a trackpad pinch as a
+    // wheel event with ctrlKey set, so this covers both.
+    if (e.ctrlKey) e.preventDefault();
+  }, { passive: false });
+
+  window.addEventListener('keydown', function (e) {
+    // Ctrl/Cmd with +, -, =, or 0 are the browser zoom shortcuts.
+    if ((e.ctrlKey || e.metaKey) && ['+', '-', '=', '0'].indexOf(e.key) !== -1) {
+      e.preventDefault();
+    }
+  });
+
+  // Safari reports pinch-zoom as gesture events rather than ctrl+wheel.
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (type) {
+    window.addEventListener(type, function (e) { e.preventDefault(); });
+  });
+
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) {
       state.pausedAt = Date.now();
