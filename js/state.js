@@ -95,6 +95,11 @@
     ],
     mouseX: 0,
     mouseY: 0,
+    // Per-button hover-rotation progress, keyed by button label. Each value is a
+    // linear 0->1 ramp that advances while hovered and rewinds when not; the
+    // easing that turns it into a rotation angle lives in ui-buttons.js.
+    buttonHoverAnim: {},
+    buttonAnimLastTime: 0,
     keys: {},
     lastTime: performance.now(),
     oreos: [],
