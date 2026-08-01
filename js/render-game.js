@@ -323,7 +323,7 @@
       state.ctx.fillText('TEACHER BOOSTED: ' + Math.ceil(state.assignmentTeacherBoostTimer), W / 2, 88);
     }
 
-    if (state.assignments.length > 0 && state.gameState === 'playing') {
+    if (state.gameState === 'playing') {
       var assignmentsLeft = F.remainingAssignments ? F.remainingAssignments() : 0;
       state.ctx.fillStyle = '#ff3333';
       state.ctx.font = 'bold 22px "Barrio", cursive';
