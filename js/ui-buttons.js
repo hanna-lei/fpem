@@ -7,7 +7,7 @@
   // unwinds back to flat once the pointer leaves. A tilt always runs to its
   // endpoint before it can turn around (see stepHoverAnim).
   var HOVER_ROT_DURATION = 0.25; // seconds for a full 0 -> peak tilt
-  var HOVER_ROT_DEG = 6;         // peak tilt in degrees
+  var HOVER_ROT_DEG = 3;         // peak tilt in degrees
   var HOVER_ROT_RAD = HOVER_ROT_DEG * Math.PI / 180;
 
   // Smoothstep easing: slow, then fast, then slow. Applied to the linear hover

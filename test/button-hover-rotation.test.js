@@ -1,12 +1,12 @@
 // Headless test for the button hover-rotation animation. It loads the real UI
 // modules with a tiny DOM/Canvas stub, drives F.drawButtons() across frames with
 // a controllable clock, and asserts the tilt:
-//   * ramps up to ~6 degrees counterclockwise over ~0.25 second while hovered,
+//   * ramps up to ~3 degrees counterclockwise over ~0.25 second while hovered,
 //   * eases in and out (slow-fast-slow) rather than moving linearly,
 //   * finishes reaching the peak before it reverses when the pointer leaves,
 //   * rewinds smoothly back to 0,
 //   * applies to inactive ("coming soon") buttons too,
-//   * never overshoots the 6 degree peak.
+//   * never overshoots the 3 degree peak.
 //
 // Run with:  node test/button-hover-rotation.test.js
 //
@@ -65,7 +65,7 @@ const F = sandbox.window.FPEM;
 const state = F.state;
 
 const DEG = Math.PI / 180;
-const PEAK = 6 * DEG;
+const PEAK = 3 * DEG;
 const DT_MS = 1000 / 60; // 60 fps
 
 let failures = 0;
@@ -108,9 +108,9 @@ const RECT = [{ x: 100, y: 100, w: 200, h: 50, label: 'Play', active: true }];
   for (let i = 0; i < 25; i++) { angle = frame(RECT, true); angles.push(angle); }
 
   check('progress reaches 1 while held', Math.abs(progress('Play') - 1) < 1e-6);
-  check('peak tilt is ~6 degrees', Math.abs(Math.abs(angle) - PEAK) < 1e-6);
+  check('peak tilt is ~3 degrees', Math.abs(Math.abs(angle) - PEAK) < 1e-6);
   check('rotation is counterclockwise (negative canvas angle)', angle < 0);
-  check('every frame stays within the 6 degree peak', angles.every((a) => Math.abs(a) <= PEAK + 1e-9));
+  check('every frame stays within the 3 degree peak', angles.every((a) => Math.abs(a) <= PEAK + 1e-9));
   check('tilt grows monotonically toward the peak', angles.every((a, i) => i === 0 || Math.abs(a) >= Math.abs(angles[i - 1]) - 1e-9));
 })();
 
