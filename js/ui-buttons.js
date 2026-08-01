@@ -4,9 +4,10 @@
 
   // Hover animation: a button tilts counterclockwise by HOVER_ROT_DEG degrees
   // over roughly HOVER_ROT_DURATION seconds while the pointer rests on it, then
-  // unwinds back to flat once the pointer leaves.
-  var HOVER_ROT_DURATION = 1.0; // seconds for a full 0 -> peak tilt
-  var HOVER_ROT_DEG = 12;       // peak tilt in degrees
+  // unwinds back to flat once the pointer leaves. A tilt always runs to its
+  // endpoint before it can turn around (see stepHoverAnim).
+  var HOVER_ROT_DURATION = 0.25; // seconds for a full 0 -> peak tilt
+  var HOVER_ROT_DEG = 6;         // peak tilt in degrees
   var HOVER_ROT_RAD = HOVER_ROT_DEG * Math.PI / 180;
 
   // Smoothstep easing: slow, then fast, then slow. Applied to the linear hover
@@ -79,15 +80,19 @@
     return null;
   };
 
-  // Advance every rendered button's hover progress toward its target (1 while
-  // hovered, 0 otherwise) using real elapsed time, so the tilt lasts about
-  // HOVER_ROT_DURATION seconds regardless of frame rate. Returns nothing; it
-  // mutates state.buttonHoverAnim in place.
+  // Advance every rendered button's tilt using real elapsed time, so a full
+  // tilt lasts about HOVER_ROT_DURATION seconds regardless of frame rate.
+  //
+  // Each button keeps { p, dir }: p is the 0..1 tilt progress and dir is the
+  // leg currently playing (+1 tilting toward the peak, -1 unwinding back to
+  // flat, 0 resting at an endpoint). A leg always runs to its endpoint before
+  // it can turn around, so leaving a button mid-tilt lets it finish reaching
+  // the peak and only then reverses. Mutates state.buttonHoverAnim in place.
   function stepHoverAnim(rects, hovered) {
     var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     if (!state.buttonAnimLastTime) state.buttonAnimLastTime = now;
     // Clamp dt so returning from another screen (or a background tab) can't
-    // snap a button instantly to its target.
+    // snap a button instantly to its endpoint.
     var dt = Math.min((now - state.buttonAnimLastTime) / 1000, 1 / 15);
     state.buttonAnimLastTime = now;
     var step = HOVER_ROT_DURATION > 0 ? dt / HOVER_ROT_DURATION : 1;
@@ -95,11 +100,25 @@
     var anim = state.buttonHoverAnim;
     for (var i = 0; i < rects.length; i++) {
       var label = rects[i].label;
-      var target = (hovered && hovered.label === label) ? 1 : 0;
-      var p = anim[label] || 0;
-      if (p < target) p = Math.min(target, p + step);
-      else if (p > target) p = Math.max(target, p - step);
-      anim[label] = p;
+      var isHovered = !!(hovered && hovered.label === label);
+      var s = anim[label];
+      if (!s) { s = { p: 0, dir: 0 }; anim[label] = s; }
+
+      // At rest, only start a leg when the endpoint disagrees with the pointer.
+      if (s.dir === 0) {
+        if (s.p <= 0 && isHovered) s.dir = 1;
+        else if (s.p >= 1 && !isHovered) s.dir = -1;
+      }
+
+      // Run the current leg to completion; decide the next leg only once an
+      // endpoint is reached.
+      if (s.dir > 0) {
+        s.p = Math.min(1, s.p + step);
+        if (s.p >= 1) { s.p = 1; s.dir = isHovered ? 0 : -1; }
+      } else if (s.dir < 0) {
+        s.p = Math.max(0, s.p - step);
+        if (s.p <= 0) { s.p = 0; s.dir = isHovered ? 1 : 0; }
+      }
     }
   }
 
@@ -113,7 +132,8 @@
 
       // Rotate around the button's center. This applies to inactive ("coming
       // soon") buttons too, since they are hoverable and share this renderer.
-      var angle = F.getButtonHoverAngle(state.buttonHoverAnim[r.label] || 0);
+      var s = state.buttonHoverAnim[r.label];
+      var angle = F.getButtonHoverAngle(s ? s.p : 0);
       state.ctx.save();
       if (angle !== 0) {
         var cx = r.x + r.w / 2, cy = r.y + r.h / 2;
