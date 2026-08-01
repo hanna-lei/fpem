@@ -32,16 +32,27 @@
     return 'top-right';
   };
   F.chooseEnemyVariant = function (ms) {
+    // Only teachers whose settings toggle is on are eligible to spawn. Each
+    // eligible teacher gets an equal share of the roll: 1 enabled => that one
+    // always spawns, 2 => 50/50, 3 => a third each. No teachers enabled => no
+    // teacher spawns this round.
+    var enabled = {
+      'Miss Bloomie': state.teacherBloomie,
+      'Miss Thavel': state.teacherThavel,
+      'Miss Circle': state.teacherCircle
+    };
+    var pool = [];
+    for (var i = 0; i < ENEMY_VARIANTS.length; i++) {
+      if (enabled[ENEMY_VARIANTS[i].name]) pool.push(ENEMY_VARIANTS[i]);
+    }
+    if (pool.length === 0) return null;
+
     var s = ms * 2654435761 | 0;
     s ^= s << 13; s ^= s >> 17; s ^= s << 5;
     var roll = (s >>> 0) / 4294967296;
-    var cumulative = 0;
-    for (var i = 0; i < ENEMY_VARIANTS.length; i++) {
-      var v = ENEMY_VARIANTS[i];
-      cumulative += v.weight;
-      if (roll < cumulative) return v;
-    }
-    return ENEMY_VARIANTS[ENEMY_VARIANTS.length - 1];
+    var idx = Math.floor(roll * pool.length);
+    if (idx >= pool.length) idx = pool.length - 1;
+    return pool[idx];
   };
   F.cellCenterPx = function (r, c) {
     var x0 = state.vLines[c] + WALL_W;

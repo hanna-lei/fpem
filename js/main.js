@@ -223,6 +223,16 @@
       if (state.mouseX >= layout2.lockersToggle.x && state.mouseX <= layout2.lockersToggle.x + layout2.lockersToggle.w && state.mouseY >= layout2.lockersToggle.y && state.mouseY <= layout2.lockersToggle.y + layout2.lockersToggle.h) {
         state.lockersEnabled = !state.lockersEnabled;
       }
+      if (layout2.teacherToggles) {
+        for (var ti = 0; ti < layout2.teacherToggles.length; ti++) {
+          var ttog = layout2.teacherToggles[ti];
+          if (state.mouseX >= ttog.x && state.mouseX <= ttog.x + ttog.w && state.mouseY >= ttog.y && state.mouseY <= ttog.y + ttog.h) {
+            if (ti === 0) state.teacherBloomie = !state.teacherBloomie;
+            else if (ti === 1) state.teacherThavel = !state.teacherThavel;
+            else state.teacherCircle = !state.teacherCircle;
+          }
+        }
+      }
       var sbtn = layout2.startBtn;
       if (state.mouseX >= sbtn.x && state.mouseX <= sbtn.x + sbtn.w && state.mouseY >= sbtn.y && state.mouseY <= sbtn.y + sbtn.h) {
         if (state.settingsStartLaunchesNewRound) F.startGame();
