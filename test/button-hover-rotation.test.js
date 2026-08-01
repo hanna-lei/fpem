@@ -1,11 +1,12 @@
 // Headless test for the button hover-rotation animation. It loads the real UI
 // modules with a tiny DOM/Canvas stub, drives F.drawButtons() across frames with
 // a controllable clock, and asserts the tilt:
-//   * ramps up to ~12 degrees counterclockwise over ~1 second while hovered,
+//   * ramps up to ~6 degrees counterclockwise over ~0.25 second while hovered,
 //   * eases in and out (slow-fast-slow) rather than moving linearly,
-//   * rewinds smoothly back to 0 once the pointer leaves,
+//   * finishes reaching the peak before it reverses when the pointer leaves,
+//   * rewinds smoothly back to 0,
 //   * applies to inactive ("coming soon") buttons too,
-//   * never overshoots the 12 degree peak.
+//   * never overshoots the 6 degree peak.
 //
 // Run with:  node test/button-hover-rotation.test.js
 //
@@ -64,13 +65,19 @@ const F = sandbox.window.FPEM;
 const state = F.state;
 
 const DEG = Math.PI / 180;
-const PEAK = 12 * DEG;
+const PEAK = 6 * DEG;
 const DT_MS = 1000 / 60; // 60 fps
 
 let failures = 0;
 function check(name, cond) {
   if (cond) { console.log('  ok   - ' + name); }
   else { console.error('  FAIL - ' + name); failures++; }
+}
+
+// Progress of a button by label (0 when it has no state yet).
+function progress(label) {
+  const s = state.buttonHoverAnim[label];
+  return s ? s.p : 0;
 }
 
 // Render one frame: advance the clock, draw a single button, and return the
@@ -91,24 +98,33 @@ function reset() {
   F.drawButtons([], null);
 }
 
+const RECT = [{ x: 100, y: 100, w: 200, h: 50, label: 'Play', active: true }];
+
 // ---- 1. Ramp up while hovered ----
 (function () {
   reset();
-  const rects = [{ x: 100, y: 100, w: 200, h: 50, label: 'Play', active: true }];
   let angle = 0;
   const angles = [];
-  for (let i = 0; i < 70; i++) { angle = frame(rects, true); angles.push(angle); }
+  for (let i = 0; i < 25; i++) { angle = frame(RECT, true); angles.push(angle); }
 
-  check('progress reaches 1 after ~1s of hover', Math.abs((state.buttonHoverAnim.Play || 0) - 1) < 1e-6);
-  check('peak tilt is ~12 degrees', Math.abs(Math.abs(angle) - PEAK) < 1e-6);
+  check('progress reaches 1 while held', Math.abs(progress('Play') - 1) < 1e-6);
+  check('peak tilt is ~6 degrees', Math.abs(Math.abs(angle) - PEAK) < 1e-6);
   check('rotation is counterclockwise (negative canvas angle)', angle < 0);
-  check('every frame stays within the 12 degree peak', angles.every((a) => Math.abs(a) <= PEAK + 1e-9));
+  check('every frame stays within the 6 degree peak', angles.every((a) => Math.abs(a) <= PEAK + 1e-9));
   check('tilt grows monotonically toward the peak', angles.every((a, i) => i === 0 || Math.abs(a) >= Math.abs(angles[i - 1]) - 1e-9));
 })();
 
-// ---- 2. Ease in / ease out (slow-fast-slow) ----
+// ---- 2. A full tilt takes about a quarter second ----
 (function () {
-  // Compare the angle change per unit of progress near the ends vs the middle.
+  reset();
+  let frames = 0;
+  while (progress('Play') < 1 && frames < 240) { frame(RECT, true); frames++; }
+  // 0.25s at 60fps = 15 steps.
+  check('a full tilt takes ~0.25s (14-16 frames at 60fps)', frames >= 14 && frames <= 16);
+})();
+
+// ---- 3. Ease in / ease out (slow-fast-slow) ----
+(function () {
   const near0 = Math.abs(F.getButtonHoverAngle(0.05) - F.getButtonHoverAngle(0.0));
   const mid = Math.abs(F.getButtonHoverAngle(0.55) - F.getButtonHoverAngle(0.45));
   const near1 = Math.abs(F.getButtonHoverAngle(1.0) - F.getButtonHoverAngle(0.95));
@@ -117,48 +133,67 @@ function reset() {
   check('mid-motion is faster than the end (ease-out)', mid > near1 * 1.5);
 })();
 
-// ---- 3. Reverse smoothly back to flat after the pointer leaves ----
+// ---- 4. Reverse smoothly back to flat from the held peak ----
 (function () {
   reset();
-  const rects = [{ x: 100, y: 100, w: 200, h: 50, label: 'Play', active: true }];
-  for (let i = 0; i < 70; i++) frame(rects, true); // hold at full tilt
+  for (let i = 0; i < 25; i++) frame(RECT, true); // hold at full tilt
 
-  const startAngle = F.getButtonHoverAngle(state.buttonHoverAnim.Play || 0);
-  let prevMag = Math.abs(startAngle);
+  let prevMag = PEAK;
   let firstStepDrop = null;
-  let angle = startAngle;
-  for (let i = 0; i < 70; i++) {
-    angle = frame(rects, false);
+  let angle = -PEAK;
+  for (let i = 0; i < 25; i++) {
+    angle = frame(RECT, false);
     const mag = Math.abs(angle);
-    if (firstStepDrop === null) firstStepDrop = Math.abs(PEAK) - mag;
+    if (firstStepDrop === null) firstStepDrop = PEAK - mag;
     check('unwind never increases the tilt (frame ' + i + ')', mag <= prevMag + 1e-9);
     prevMag = mag;
   }
-  check('progress returns to 0 after ~1s', Math.abs(state.buttonHoverAnim.Play || 0) < 1e-6);
+  check('progress returns to 0', Math.abs(progress('Play')) < 1e-6);
   check('final tilt is flat', Math.abs(angle) < 1e-9);
-  // A smooth ease-out starts slowly: the first reverse step barely moves.
-  check('reversal starts gently (no jump)', firstStepDrop !== null && firstStepDrop < PEAK * 0.05);
+  check('reversal starts gently (no jump)', firstStepDrop !== null && firstStepDrop < PEAK * 0.15);
 })();
 
-// ---- 4. Inactive ("coming soon") buttons animate too ----
+// ---- 5. Leaving mid-tilt finishes reaching the peak BEFORE reversing ----
+(function () {
+  reset();
+  for (let i = 0; i < 6; i++) frame(RECT, true); // partway up (~0.4)
+  const pAtLeave = progress('Play');
+  const magAtLeave = Math.abs(F.getButtonHoverAngle(pAtLeave));
+  check('pointer leaves while still mid-tilt', pAtLeave > 0.2 && pAtLeave < 0.9);
+
+  // After leaving, the tilt must keep rising to the peak, then fall to flat,
+  // and never turn around before hitting the peak.
+  let phase = 'up';
+  let prev = magAtLeave;
+  let shapeOk = true;
+  let reachedPeak = false;
+  let firstAfterLeave = null;
+  let last = 0;
+  for (let i = 0; i < 60; i++) {
+    const mag = Math.abs(frame(RECT, false));
+    if (firstAfterLeave === null) firstAfterLeave = mag;
+    if (phase === 'up') {
+      if (mag + 1e-9 < prev) shapeOk = false;          // must not drop while rising
+      if (Math.abs(mag - PEAK) < 1e-6) { phase = 'down'; reachedPeak = true; }
+    } else {
+      if (mag > prev + 1e-9) shapeOk = false;          // must not rise while falling
+    }
+    prev = mag;
+    last = mag;
+  }
+  check('tilt keeps rising right after the pointer leaves', firstAfterLeave > magAtLeave + 1e-9);
+  check('tilt reaches the full peak after leaving', reachedPeak);
+  check('tilt rises to the peak then falls, never reversing early', shapeOk && phase === 'down');
+  check('tilt ends flat', Math.abs(last) < 1e-9);
+})();
+
+// ---- 6. Inactive ("coming soon") buttons animate too ----
 (function () {
   reset();
   const rects = [{ x: 100, y: 100, w: 200, h: 50, label: 'Tutorial', active: false }];
   let angle = 0;
-  for (let i = 0; i < 30; i++) angle = frame(rects, true);
-  check('inactive button gains a counterclockwise tilt when hovered', angle < 0 && (state.buttonHoverAnim.Tutorial || 0) > 0);
-})();
-
-// ---- 5. Mid-hover reversal is continuous (no snap) ----
-(function () {
-  reset();
-  const rects = [{ x: 100, y: 100, w: 200, h: 50, label: 'Play', active: true }];
-  for (let i = 0; i < 30; i++) frame(rects, true); // partway up (~0.5)
-  const before = state.buttonHoverAnim.Play || 0;
-  const a1 = F.getButtonHoverAngle(before);
-  const a2 = frame(rects, false); // first unhover frame
-  check('progress was mid-way when the pointer left', before > 0.3 && before < 0.7);
-  check('mid-hover reversal moves by at most one frame step', Math.abs(Math.abs(a2) - Math.abs(a1)) < PEAK * 0.05);
+  for (let i = 0; i < 20; i++) angle = frame(rects, true);
+  check('inactive button gains a counterclockwise tilt when hovered', angle < 0 && progress('Tutorial') > 0);
 })();
 
 if (failures === 0) {
