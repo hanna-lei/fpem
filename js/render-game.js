@@ -79,7 +79,7 @@
       }
     }
 
-    if (state.enemy.active && assignmentImg.complete && assignmentImg.naturalWidth > 0) {
+    if ((state.enemy.active || !state.enemyVariant) && assignmentImg.complete && assignmentImg.naturalWidth > 0) {
       var assignmentDrawW = ASSIGNMENT_TILE_W * T * 1.5;
       var assignmentDrawH = (oreoImg.complete && oreoImg.naturalWidth > 0) ?
         (oreoImg.naturalHeight / oreoImg.naturalWidth) * assignmentDrawW :
@@ -296,13 +296,20 @@
     }
 
     var elapsedSec = F.getElapsedSec ? F.getElapsedSec() : (Date.now() - state.startTime) / 1000;
-    if (state.enemyVariant && !state.enemy.active && state.gameState === 'playing') {
-      var secsLeft = Math.max(0, Math.ceil(ENEMY_SPAWN_DELAY - elapsedSec));
-      if (secsLeft > 0) {
-        state.ctx.fillStyle = state.enemyVariant.body;
+    if (state.gameState === 'playing') {
+      if (!state.enemyVariant) {
+        state.ctx.fillStyle = '#fff';
         state.ctx.font = 'bold 20px "Barrio", cursive';
         state.ctx.textAlign = 'center';
-        state.ctx.fillText('⚠️ ' + state.enemyVariant.name.toUpperCase() + ' ENTERS IN ' + secsLeft + '...', W / 2, 60);
+        state.ctx.fillText('There appear to be no teachers nearby…', W / 2, 60);
+      } else if (!state.enemy.active) {
+        var secsLeft = Math.max(0, Math.ceil(ENEMY_SPAWN_DELAY - elapsedSec));
+        if (secsLeft > 0) {
+          state.ctx.fillStyle = state.enemyVariant.body;
+          state.ctx.font = 'bold 20px "Barrio", cursive';
+          state.ctx.textAlign = 'center';
+          state.ctx.fillText('⚠️ ' + state.enemyVariant.name.toUpperCase() + ' ENTERS IN ' + secsLeft + '...', W / 2, 60);
+        }
       }
     }
 
