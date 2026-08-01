@@ -296,29 +296,27 @@
     }
 
     var elapsedSec = F.getElapsedSec ? F.getElapsedSec() : (Date.now() - state.startTime) / 1000;
-    if (state.gameState === 'playing') {
-      if (!state.enemyVariant) {
-        state.ctx.fillStyle = '#fff';
+    if (state.gameState === 'playing' && !state.enemy.active) {
+      var secsLeft = Math.max(0, Math.ceil(ENEMY_SPAWN_DELAY - elapsedSec));
+      if (secsLeft > 0) {
         state.ctx.font = 'bold 20px "Barrio", cursive';
         state.ctx.textAlign = 'center';
-        state.ctx.fillText('There appear to be no teachers nearby…', W / 2, 60);
-      } else if (!state.enemy.active) {
-        var secsLeft = Math.max(0, Math.ceil(ENEMY_SPAWN_DELAY - elapsedSec));
-        if (secsLeft > 0) {
+        if (!state.enemyVariant) {
+          state.ctx.fillStyle = '#fff';
+          state.ctx.fillText('There appear to be no teachers nearby…', W / 2, 60);
+        } else {
           state.ctx.fillStyle = state.enemyVariant.body;
-          state.ctx.font = 'bold 20px "Barrio", cursive';
-          state.ctx.textAlign = 'center';
           state.ctx.fillText('⚠️ ' + state.enemyVariant.name.toUpperCase() + ' ENTERS IN ' + secsLeft + '...', W / 2, 60);
         }
       }
     }
 
-    if (state.assignmentTeacherStunTimer > 0) {
+    if (state.enemyVariant && state.assignmentTeacherStunTimer > 0) {
       state.ctx.fillStyle = '#88d8ff';
       state.ctx.font = 'bold 18px "Barrio", cursive';
       state.ctx.textAlign = 'center';
       state.ctx.fillText('TEACHER STUNNED: ' + Math.ceil(state.assignmentTeacherStunTimer), W / 2, 88);
-    } else if (state.assignmentTeacherBoostTimer > 0) {
+    } else if (state.enemyVariant && state.assignmentTeacherBoostTimer > 0) {
       state.ctx.fillStyle = '#ff7777';
       state.ctx.font = 'bold 18px "Barrio", cursive';
       state.ctx.textAlign = 'center';
@@ -376,7 +374,7 @@
       state.ctx.fillStyle = '#fff'; state.ctx.font = '24px "Barrio", cursive';
       var winMsg = state.enemyVariant
         ? ('Escaped ' + state.enemyVariant.name + ' in ' + state.elapsed + ' seconds!')
-        : ('Cleared the maze in ' + state.elapsed + ' seconds!');
+        : ('Escaped the classroom in ' + state.elapsed + ' seconds!');
       state.ctx.fillText(winMsg, W / 2, H / 2 + 25);
       var rectsW = F.getEndGameButtonRects();
       var hoveredW = F.getHoveredEndGameButton();
