@@ -325,7 +325,7 @@
     var wx = state.player.x - state.exitX, wy = state.player.y - state.exitY;
     if (F.remainingAssignments() === 0 && Math.sqrt(wx * wx + wy * wy) < state.exitR) { state.won = true; state.gameState = 'won'; state.bgMusic.pause(); return; }
 
-    if (elapsedSec >= ENEMY_SPAWN_DELAY) {
+    if (state.enemyVariant && elapsedSec >= ENEMY_SPAWN_DELAY) {
       if (!state.enemy.active) {
         state.enemy.active = true;
         F.recalcEnemyPath();

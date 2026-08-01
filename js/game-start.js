@@ -37,10 +37,15 @@
     state.exitCorner = F.chooseExitCorner(masterSeed);
     state.enemyVariant = F.chooseEnemyVariant(masterSeed);
 
-    state.EW = state.enemyVariant.w;
-    state.EH = state.enemyVariant.h;
-
-    state.BASE_ENEMY_SPEED = state.enemyVariant.speed;
+    if (state.enemyVariant) {
+      state.EW = state.enemyVariant.w;
+      state.EH = state.enemyVariant.h;
+      state.BASE_ENEMY_SPEED = state.enemyVariant.speed;
+    } else {
+      state.EW = 0;
+      state.EH = 0;
+      state.BASE_ENEMY_SPEED = 0;
+    }
     state.currentEnemySpeed = state.BASE_ENEMY_SPEED;
 
     var chosenSeed = 0;
@@ -355,6 +360,6 @@
       state.bgMusic.pause();
     }
 
-    console.log('Seed: ' + chosenSeed + ', Exit: ' + state.exitCorner + ', Enemy: ' + state.enemyVariant.name);
+    console.log('Seed: ' + chosenSeed + ', Exit: ' + state.exitCorner + ', Enemy: ' + (state.enemyVariant ? state.enemyVariant.name : 'None'));
   };
 })();

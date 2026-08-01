@@ -99,8 +99,9 @@
     var row1H = cols === 1 ? darknessH + assignmentsH : Math.max(darknessH, assignmentsH);
     var row2H = cols === 1 ? itemsH + lockersH : Math.max(itemsH, lockersH);
     var mapBlockH = 35 + 35 + 25 + 50;
+    var teachersBlockH = 35 + 22 + 30 + 30;
     var headerH = 75;
-    var totalH = headerH + row1H + row2H + mapBlockH + 50;
+    var totalH = headerH + row1H + row2H + mapBlockH + teachersBlockH + 50;
 
     var topMargin = 30;
     var bottomMargin = 30;
@@ -150,6 +151,19 @@
     var mapSliderTextY = mapY;
     mapY += 50;
 
+    var teachersLabelY = mapY;
+    mapY += 35;
+    var teacherNameY = mapY;
+    mapY += 22;
+    var teacherToggleY = mapY;
+    var teacherColW = settingsGridW / 3;
+    var teacherToggles = [
+      placeToggle(settingsGridX, teacherToggleY, teacherColW),
+      placeToggle(settingsGridX + teacherColW, teacherToggleY, teacherColW),
+      placeToggle(settingsGridX + 2 * teacherColW, teacherToggleY, teacherColW)
+    ];
+    mapY += 30 + 30;
+
     var startBtnW = Math.min(280, settingsGridW);
     var startBtn = {
       x: settingsGridX + (settingsGridW - startBtnW) / 2,
@@ -181,6 +195,9 @@
       mapSizeLabelY: mapSizeLabelY,
       mapSlider: mapSlider,
       mapSliderTextY: mapSliderTextY,
+      teachersLabelY: teachersLabelY,
+      teacherNameY: teacherNameY,
+      teacherToggles: teacherToggles,
       startBtn: startBtn,
       itemSlidersVertical: verticalItemSliders
     };
@@ -401,6 +418,35 @@
     state.ctx.font = '14px "Barrio", cursive';
     var mapText = state.mapSize + ' tiles (' + gridSz + '×' + gridSz + ' grid, ' + F.getTargetDeadEnds(state.mapSize) + ' dead ends)';
     state.ctx.fillText(mapText, W / 2, layout.mapSliderTextY);
+
+    state.ctx.fillStyle = '#fff';
+    state.ctx.font = 'bold 22px "Barrio", cursive';
+    state.ctx.fillText('Teachers', W / 2, layout.teachersLabelY);
+
+    var teacherNames = ['Bloomie', 'Thavel', 'Circle'];
+    var teacherEnabled = [state.teacherBloomie, state.teacherThavel, state.teacherCircle];
+    for (var t = 0; t < 3; t++) {
+      var ttog = layout.teacherToggles[t];
+      var tCenterX = ttog.x + ttog.w / 2;
+
+      state.ctx.fillStyle = '#fff';
+      state.ctx.font = '16px "Barrio", cursive';
+      state.ctx.fillText(teacherNames[t], tCenterX, layout.teacherNameY);
+
+      state.ctx.fillStyle = teacherEnabled[t] ? '#4caf50' : '#555';
+      var ttogR = ttog.h / 2;
+      state.ctx.beginPath();
+      state.ctx.arc(ttog.x + ttogR, ttog.y + ttogR, ttogR, Math.PI * 0.5, Math.PI * 1.5);
+      state.ctx.arc(ttog.x + ttog.w - ttogR, ttog.y + ttogR, ttogR, Math.PI * 1.5, Math.PI * 0.5);
+      state.ctx.closePath();
+      state.ctx.fill();
+
+      state.ctx.fillStyle = '#fff';
+      var tKnobX = teacherEnabled[t] ? ttog.x + ttog.w - ttogR : ttog.x + ttogR;
+      state.ctx.beginPath();
+      state.ctx.arc(tKnobX, ttog.y + ttogR, ttogR - 3, 0, Math.PI * 2);
+      state.ctx.fill();
+    }
 
     var sr = layout.startBtn;
     var isHovered = state.mouseX >= sr.x && state.mouseX <= sr.x + sr.w && state.mouseY >= sr.y && state.mouseY <= sr.y + sr.h;
