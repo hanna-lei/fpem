@@ -308,7 +308,9 @@
       }
     }
 
-    if (state.enemy.active) {
+    // Assignments become interactable once the teacher enters. When no teacher
+    // is spawning this round, they are live from the start instead.
+    if (state.enemy.active || !state.enemyVariant) {
       var assignment;
       for (var asi = 0; asi < state.assignments.length; asi++) {
         assignment = state.assignments[asi];

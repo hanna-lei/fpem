@@ -156,5 +156,45 @@ function sample(bloomie, thavel, circle) {
   check(!state.lost, 'no teacher => player is never caught');
 })();
 
+// Integration: with no teacher, an assignment is live immediately (before the
+// spawn delay would have elapsed) rather than waiting for a teacher that never
+// comes. Standing on the assignment should start its challenge right away.
+(function () {
+  state.teacherBloomie = false;
+  state.teacherThavel = false;
+  state.teacherCircle = false;
+
+  F.rebuildMapGrid(60);
+  const targetDE = F.getTargetDeadEnds(60);
+  state.exitCorner = 'bottom-right';
+  state.enemyVariant = F.chooseEnemyVariant(Date.now());
+  state.EW = 0; state.EH = 0; state.BASE_ENEMY_SPEED = 0; state.currentEnemySpeed = 0;
+  F.generateMaze(12345, targetDE);
+  state.oreos.length = state.apples.length = state.kitkats.length = 0;
+  state.flashlights.length = state.lockers.length = 0;
+
+  state.gameState = 'playing';
+  state.won = state.lost = false;
+  state.assignmentPausedMs = 0; state.assignmentPausedAt = 0; state.assignmentActive = false;
+  clock = 0; state.lastTime = 0;
+
+  const start = F.getCornerPos('top-left');
+  state.player.x = start.x * T; state.player.y = start.y * T; state.player.dir = 0;
+  state.enemy.x = state.player.x; state.enemy.y = state.player.y;
+  state.enemy.active = false; state.enemy.dir = 0;
+  state.enemyWaypoints = []; state.enemyWpIdx = 0; state.enemyRepathTimer = 0;
+  for (const k in state.keys) state.keys[k] = false;
+
+  // One uncollected assignment sitting right on the player.
+  state.assignments = [{ x: state.player.x, y: state.player.y, collected: false }];
+
+  // Fresh round: elapsed ~0, i.e. well before the teacher would ever spawn.
+  state.startTime = Date.now();
+  clock += 1000 / 60;
+  F.update();
+
+  check(state.assignmentActive === true, 'no teacher => assignment is live immediately (challenge starts at t~0)');
+})();
+
 if (ok) { console.log('\nteacher-selection: PASS'); process.exit(0); }
 else { console.error('\nteacher-selection: FAIL'); process.exit(1); }
