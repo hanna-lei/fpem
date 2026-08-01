@@ -371,7 +371,17 @@
         state.spriteAnimTimer += dt;
         if (state.spriteAnimTimer >= 1 / SPRITE_ANIM_FPS) {
           state.spriteAnimTimer -= 1 / SPRITE_ANIM_FPS;
-          state.spriteAnimFrame = (state.spriteAnimFrame + 1) % 4;
+          var frameCount = state.enemyVariant.sprite.frames.length;
+          if (state.enemyVariant.pingPongAnim) {
+            // Ping-pong: walk up to the last frame, then back down, then up
+            // again (0,1,2,3,2,1,0,1,2,3,... -> frames 1-2-3-4-3-2-1-2-3-4...).
+            var next = state.spriteAnimFrame + state.spriteAnimDir;
+            if (next >= frameCount - 1) { next = frameCount - 1; state.spriteAnimDir = -1; }
+            else if (next <= 0) { next = 0; state.spriteAnimDir = 1; }
+            state.spriteAnimFrame = next;
+          } else {
+            state.spriteAnimFrame = (state.spriteAnimFrame + 1) % frameCount;
+          }
         }
       }
 
