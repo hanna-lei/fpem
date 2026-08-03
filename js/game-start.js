@@ -102,6 +102,7 @@
 
     state.spriteAnimTimer = 0;
     state.spriteAnimFrame = 0;
+    state.spriteAnimDir = 1;
 
     state.won = false;
     state.lost = false;

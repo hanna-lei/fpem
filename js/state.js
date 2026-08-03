@@ -88,6 +88,7 @@
     enemyRepathTimer: 0,
     spriteAnimTimer: 0,
     spriteAnimFrame: 0,
+    spriteAnimDir: 1,
     menuButtons: [
       { label: 'Tutorial', active: false },
       { label: 'Play', active: false },

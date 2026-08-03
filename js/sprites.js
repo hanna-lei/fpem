@@ -44,7 +44,7 @@
       minimap: '#4287f5',
       speed: 20 * T, w: 6 * T, h: 6 * T,
       drawW: 8 * T, drawH: 8 * T,
-      sprite: F.bloomieSprite
+      sprite: F.bloomieSprite, pingPongAnim: true
     },
     {
       name: 'Miss Thavel',
@@ -52,7 +52,7 @@
       minimap: '#3da34d',
       speed: 18 * T, w: 5 * T, h: 7 * T,
       drawW: 10 * T, drawH: 9 * T,
-      sprite: F.thavelSprite
+      sprite: F.thavelSprite, pingPongAnim: true
     }
   ];
 })();
