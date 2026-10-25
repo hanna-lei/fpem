@@ -137,12 +137,12 @@
     var ppx = W / 2, ppy = H / 2, phw = PW / 2, phh = PH / 2;
 
     // Once FLASHLIGHT_FULL_CLEAR_COUNT flashlights are active at the same time,
-    // the maze is lit as if Darkness mode were turned off: every darkness
-    // overlay below is skipped until the active count drops back down.
+    // the black darkness overlay is skipped until the active count drops back
+    // down. The red player glow stays on whenever Darkness mode is enabled.
     var darknessVisible = state.darknessEnabled &&
       state.flashlightTimers.length < FLASHLIGHT_FULL_CLEAR_COUNT;
 
-    if (darknessVisible) {
+    if (state.darknessEnabled) {
       var redGlow = state.ctx.createRadialGradient(ppx, ppy, 0, ppx, ppy, PLAYER_RED_GLOW_RADIUS);
       redGlow.addColorStop(0, 'rgba(220, 70, 70, 0.3)');
       redGlow.addColorStop(0.35, 'rgba(200, 45, 45, 0.15)');

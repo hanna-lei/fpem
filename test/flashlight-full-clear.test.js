@@ -4,9 +4,13 @@
 // Behaviour under test (js/render-game.js): while Darkness mode is on, the
 // visible radius is base * (1 + 0.25 * activeFlashlights). Once
 // FLASHLIGHT_FULL_CLEAR_COUNT (5) flashlights are active at the same time the
-// maze is lit exactly as if Darkness were toggled off: both the dark overlay
-// and the red player glow are skipped. Dropping back to 4 restores the normal
-// formula (4 active => 2.0x the base radius).
+// dark overlay is skipped, but the red player glow stays on. Dropping back to
+// 4 restores the normal formula (4 active => 2.0x the base radius).
+//
+// Behaviour under test (js/update.js): when the active count rises from below
+// 5 to 5+, every flashlight timer (including ones added during the pause) is
+// frozen for FLASHLIGHT_FREEZE_DURATION (3s). Going 5 -> 6 or 6 -> 5 never
+// starts or extends a freeze.
 //
 // This test loads the real game modules, starts a real round, and inspects
 // what renderGame() draws. The dark overlay is the only code that creates a
@@ -139,11 +143,12 @@ assert(approx(r.outerRadius, BASE * 2.0 * OUTER),
 // --- 5 flashlights: darkness fully cleared (as if the toggle were off) ---
 r = renderWith(5);
 assert(!r.overlayDrawn, '5 flashlights: dark overlay must NOT be drawn');
-assert(!r.redGlowDrawn, '5 flashlights: red player glow must NOT be drawn');
+assert(r.redGlowDrawn, '5 flashlights: red player glow should stay on');
 
 // --- 6 flashlights: still fully cleared ---
 r = renderWith(6);
 assert(!r.overlayDrawn, '6 flashlights: dark overlay must NOT be drawn');
+assert(r.redGlowDrawn, '6 flashlights: red player glow should stay on');
 
 // --- back down to 4: darkness returns with the normal formula ---
 r = renderWith(4);
@@ -156,4 +161,77 @@ state.darknessEnabled = false;
 r = renderWith(0);
 assert(!r.overlayDrawn, 'darkness off: dark overlay must never be drawn');
 
-console.log('flashlight-full-clear: OK (7 assertions passed)');
+state.darknessEnabled = true;
+
+// ---- Freeze behaviour (F.update) ----
+const DT = 1 / 20; // 50ms ticks, below update()'s 1/15s dt clamp
+function resetTimers(list) {
+  state.flashlightTimers.length = 0;
+  for (const t of list) state.flashlightTimers.push(t);
+  state.flashlightFreezeTimer = 0;
+  state.prevFlashlightCount = state.flashlightTimers.length;
+  state.lastTime = clock;
+}
+function tick(seconds) {
+  const n = Math.round(seconds / DT);
+  for (let i = 0; i < n; i++) {
+    state.gameState = 'playing'; state.won = false; state.lost = false;
+    state.enemy.active = false; state.assignmentActive = false;
+    clock += DT * 1000;
+    F.update();
+  }
+}
+function use() { state.flashlightTimers.push(F.FLASHLIGHT_DURATION); }
+
+assert.strictEqual(F.FLASHLIGHT_FREEZE_DURATION, 3);
+
+// 4 -> 5 freezes all timers for 3s, then they resume where they stopped.
+resetTimers([4, 4, 4, 4]);
+use();
+tick(1);
+assert(approx(state.flashlightFreezeTimer, 2), '4->5: freeze should be counting down, got ' + state.flashlightFreezeTimer);
+tick(1.5);
+assert.deepStrictEqual(Array.from(state.flashlightTimers), [4, 4, 4, 4, 5], '4->5: timers must not move during freeze');
+tick(0.5);
+assert(approx(state.flashlightFreezeTimer, 0), '4->5: freeze should end after 3s, got ' + state.flashlightFreezeTimer);
+tick(1);
+assert(approx(state.flashlightTimers[0], 3), '4->5: timers should resume after freeze, got ' + state.flashlightTimers[0]);
+
+// A 6th flashlight used mid-freeze waits too, and does not extend the freeze.
+resetTimers([4, 4, 4, 4]);
+use();
+tick(1);
+use();
+tick(1);
+assert(approx(state.flashlightFreezeTimer, 1), '6th mid-freeze: freeze must not be extended, got ' + state.flashlightFreezeTimer);
+assert.strictEqual(state.flashlightTimers[5], 5, '6th mid-freeze: its timer must wait for the freeze to end');
+tick(1);
+assert(approx(state.flashlightFreezeTimer, 0), '6th mid-freeze: freeze should end on time');
+
+// 5 -> 6 after the freeze never starts a new freeze.
+resetTimers([4, 4, 4, 4, 4]);
+use();
+tick(1);
+assert.strictEqual(state.flashlightFreezeTimer, 0, '5->6: must not freeze');
+assert(approx(state.flashlightTimers[0], 3), '5->6: timers keep running');
+
+// 6 -> 5 (one runs out) never starts a freeze.
+resetTimers([0.5, 4, 4, 4, 4, 4]);
+tick(1);
+assert.strictEqual(state.flashlightTimers.length, 5, '6->5: first flashlight should expire normally');
+assert.strictEqual(state.flashlightFreezeTimer, 0, '6->5: must not freeze');
+
+// Dropping to 4 and climbing back to 5 freezes again.
+resetTimers([0.5, 4, 4, 4, 4]);
+tick(1);
+assert.strictEqual(state.flashlightTimers.length, 4);
+use();
+tick(0.5);
+assert(approx(state.flashlightFreezeTimer, 2.5), '4->5 again: should freeze again, got ' + state.flashlightFreezeTimer);
+
+// Starting a new round clears any freeze.
+F.startGame({ autoStart: false });
+assert.strictEqual(state.flashlightFreezeTimer, 0);
+assert.strictEqual(state.prevFlashlightCount, 0);
+
+console.log('flashlight-full-clear: OK');

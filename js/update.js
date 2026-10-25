@@ -13,6 +13,8 @@
   var CIRCLE_SLOW_AMOUNT = F.CIRCLE_SLOW_AMOUNT;
   var ENEMY_REPATH_INTERVAL = F.ENEMY_REPATH_INTERVAL;
   var ENEMY_SPAWN_DELAY = F.ENEMY_SPAWN_DELAY;
+  var FLASHLIGHT_FREEZE_DURATION = F.FLASHLIGHT_FREEZE_DURATION;
+  var FLASHLIGHT_FULL_CLEAR_COUNT = F.FLASHLIGHT_FULL_CLEAR_COUNT;
   var KITKAT_SLOW_MULT = F.KITKAT_SLOW_MULT;
   var MAX_STAMINA = F.MAX_STAMINA;
   var OREO_SPEED_BOOST = F.OREO_SPEED_BOOST;
@@ -122,10 +124,25 @@
     }
     state.kitkatSlowActive = state.kitkatSlowTimers.length > 0;
 
+    // Reaching FLASHLIGHT_FULL_CLEAR_COUNT active flashlights (from fewer)
+    // pauses every flashlight timer, including ones added during the pause,
+    // for FLASHLIGHT_FREEZE_DURATION seconds. Going above the count, or
+    // dropping back down to it, never starts or extends a freeze.
+    if (state.prevFlashlightCount < FLASHLIGHT_FULL_CLEAR_COUNT &&
+        state.flashlightTimers.length >= FLASHLIGHT_FULL_CLEAR_COUNT) {
+      state.flashlightFreezeTimer = FLASHLIGHT_FREEZE_DURATION;
+    }
+    var flashlightDt = dt;
+    if (state.flashlightFreezeTimer > 0) {
+      var frozen = Math.min(state.flashlightFreezeTimer, dt);
+      state.flashlightFreezeTimer -= frozen;
+      flashlightDt = dt - frozen;
+    }
     for (var fi = state.flashlightTimers.length - 1; fi >= 0; fi--) {
-      state.flashlightTimers[fi] -= dt;
+      state.flashlightTimers[fi] -= flashlightDt;
       if (state.flashlightTimers[fi] <= 0) state.flashlightTimers.splice(fi, 1);
     }
+    state.prevFlashlightCount = state.flashlightTimers.length;
     state.flashlightActive = state.flashlightTimers.length > 0;
 
     if (state.assignmentTeacherStunTimer > 0) {

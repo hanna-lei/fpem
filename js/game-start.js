@@ -119,6 +119,8 @@
     state.kitkatSlowActive = false;
 
     state.flashlightTimers.length = 0;
+    state.flashlightFreezeTimer = 0;
+    state.prevFlashlightCount = 0;
     state.flashlightActive = false;
     state.assignmentActive = false;
     state.assignmentPausedAt = 0;
