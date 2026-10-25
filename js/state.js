@@ -121,6 +121,8 @@
     invincibleStacks: 0,
     kitkatSlowTimers: [],
     flashlightTimers: [],
+    flashlightFreezeTimer: 0,
+    prevFlashlightCount: 0,
     kitkatSlowActive: false,
     flashlightActive: false,
     assignmentActive: false,
