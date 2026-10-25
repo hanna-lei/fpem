@@ -6,6 +6,7 @@
   var kitkatImg = F.kitkatImg;
   var appleImg = F.appleImg;
   var flashlightImg = F.flashlightImg;
+  var FLASHLIGHT_FULL_CLEAR_COUNT = F.FLASHLIGHT_FULL_CLEAR_COUNT;
   var APPLE_TILE_H = F.APPLE_TILE_H;
   var ASSIGNMENT_CHALLENGE_DURATION = F.ASSIGNMENT_CHALLENGE_DURATION;
   var ASSIGNMENT_TILE_W = F.ASSIGNMENT_TILE_W;
@@ -135,7 +136,13 @@
 
     var ppx = W / 2, ppy = H / 2, phw = PW / 2, phh = PH / 2;
 
-    if (state.darknessEnabled) {
+    // Once FLASHLIGHT_FULL_CLEAR_COUNT flashlights are active at the same time,
+    // the maze is lit as if Darkness mode were turned off: every darkness
+    // overlay below is skipped until the active count drops back down.
+    var darknessVisible = state.darknessEnabled &&
+      state.flashlightTimers.length < FLASHLIGHT_FULL_CLEAR_COUNT;
+
+    if (darknessVisible) {
       var redGlow = state.ctx.createRadialGradient(ppx, ppy, 0, ppx, ppy, PLAYER_RED_GLOW_RADIUS);
       redGlow.addColorStop(0, 'rgba(220, 70, 70, 0.3)');
       redGlow.addColorStop(0.35, 'rgba(200, 45, 45, 0.15)');
@@ -213,7 +220,7 @@
       }
     }
 
-    if (state.darknessEnabled) {
+    if (darknessVisible) {
       var darkCanvas = document.createElement('canvas');
       darkCanvas.width = W; darkCanvas.height = H;
       var dctx = darkCanvas.getContext('2d');
